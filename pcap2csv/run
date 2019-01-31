@@ -1,0 +1,55 @@
+#!/bin/sh
+#!/bin/bash
+# Get input arguments
+if [ $# -ge 2 ]; then # check if two arguments are passed
+    indir=${1%/}      # strip away trailing slash
+    outdir=${2%/}     # strip away trailing slash
+else
+    if [ $# -lt 1 ]; then echo "Err arg1 missing: Input direcotry or path for PCAP files is missing."; fi # if less than 1 arguments passed
+    if [ $# -lt 2 ]; then echo "Err arg2 missing: Output direcotry or path is missing."; fi               # if less than 2 arguments passed
+    echo "Usage: $0 <input-PCAP-file-directory> <output-CSV-files-directory> <filter>"
+    return
+fi
+
+if [ $# -ge 3 ]; then # check if third argument is passed
+    filter=$3
+    echo "Filter: $filter"
+else
+    filter="*switch*.pcap"
+    echo "arg3 is missing. No filter argument is passed. Using the default filter: $filter"
+fi
+
+# Check existence of the directories
+if [ ! -d $indir ]; then echo "Err arg1: Input directory does not exist."; return; fi
+if [ ! -d $outdir ]; then echo "Err arg2: Output directory does not exist."; return; fi 
+
+# for file in `ls -1 $indir/$filter`; do
+#     echo "$file $(($(stat -c%s $file)/1024/1024))"
+# done
+# return
+
+dummyname=""
+hflag="-h" # enable header flag
+
+for file in `ls -1 $indir/$filter`; do
+    filename=$(basename -- "$file")  # get base filename
+    output="$outdir/${filename%.*}"  # strip away the extension
+    output="$output.csv"             # add the .csv extension
+    truncate -s 0 $output            # empty the file if exists
+    echo $output
+    
+    size=$(($(stat -c%s $file)/1024/1024)) # size in MB
+    if [ $size -gt 40 ]; then # If pcap file is too big
+        dummyname="xyzdum"
+        echo "File is too large. Breaking into smaller $dummyname*.pcap pieces."
+        editcap -c 500000 $file /tmp/"$dummyname.pcap" # break into smaller dummy pieces. 500,000 entries is about 30MB
+        for dummy in `ls -1 /tmp/*$dummyfile*.pcap`; do # pass each peice to tshark and append all results in the output
+            echo " dummy $dummy >> $output"
+            ./run-tshark $hflag $dummy >> $output
+            hflag="" # for the next runs remove header flag
+            rm $dummy
+        done
+    else
+        ./run-tshark $hflag $file >> $output
+    fi
+done

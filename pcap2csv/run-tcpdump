@@ -1,0 +1,48 @@
+#!/bin/sh
+
+[ $# -ge 1 -a -f "$1" ] && input="$1" || input="-"
+
+if [ $1 ]; then
+    input=$1
+else
+    echo "Err: No filename is passed."
+    echo "Usage 1: $0 <filename>"
+    echo "Usage 2: <a program output> | $0"
+    # return
+fi
+
+col_format='
+   "No.","%m",
+   "Time","%t",
+   "Source","%s",
+   "Destination","%d",
+   "Protocol","%p",
+   "SrcPort","%S",
+   "DstPort","%D",
+   "TTL", "%Cus:ip.ttl:0:R",
+   "Length","%L",
+   "Info","%i"'
+header='Number,Time_Epoch,SrcIp,DstIp,Protocol,SrcPrt,DstPrt,TTL,FrameLen,Info...'
+
+echo $header
+tcpdump -r $input ip
+    # | sed -r 's/ +//' \
+    # | sed -r 's/→/ /g' \
+    # | sed -r 's/[\t ]+/,/g'
+#| sed -r 's/ +//' \             omit initial spaces
+#| sed -r 's/→/ /g' \            replace arrow character with blanks
+#| sed -r 's/[[:blank:]]+/,/g'   replace sequence of blank characters with comma
+
+# sleep 4
+
+# tshark -r $file -E header=y -E separator=, -t e \
+    # -Y "ip" \
+    # -T fields \
+    # -e frame.number \
+    # -e frame.time_epoch \
+    # -e ip.src \
+    # -e ip.dst \
+    # -e _ws.col.Protocol \
+    # -e _ws.col.SrcPort \
+    # -e _ws.col.DstPort \
+    # -e frame.len 
