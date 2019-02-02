@@ -34,7 +34,7 @@ col_format='
    "DstPort","%D",
    "Info","%i"'
 
-header='Number,Time_Epoch,SrcIp,DstIp,ProtocolTTL,FrameLen,SrcPrt,DstPrt,Info...'
+header='Number,Time_Epoch,SrcIp,DstIp,Protocol,TTL,FrameLen,SrcPrt,DstPrt,Info...'
 
 if [ $header_flag ]; then echo $header; fi
 

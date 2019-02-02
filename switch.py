@@ -1,4 +1,5 @@
 import os
+import sys
 import csv
 
 from structures import Stats
@@ -18,6 +19,7 @@ def Parse_Csv (filepath):
                 yield [ conv(i) for i in p ]
 
     packets = list (read_csv(filepath))
+
 
     # Get indices for each column label
     for i in range (len (packets[0])):
@@ -113,10 +115,13 @@ class Switch_Driver:
         
         self.next_pkt_id = 1 # 0th row of the file is expected to be column names
         self.timewin = float (timewin)
-        self.time    = float (self.packets [1][self.iTime]) # time of the first packet
+        self.time = sys.float_info.max
+        if len (self.packets) > 1
+            self.time    = float (self.packets [1][self.iTime]) # time of the first packet
         
     def adjustTime (self):
-        t = self.packets [1][self.iTime] # time of the first packet
+        if len (self.packets) > 1
+            t = self.packets [1][self.iTime] # time of the first packet
         while self.time + self.timewin < t:
             self.time += self.timewin
 
