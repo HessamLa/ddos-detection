@@ -32,18 +32,18 @@ class Controller:
         return self.data
 
     def process_table (self, table):
-        print 'Processing table'
+        print ('Processing table')
 
         
     def process_stats (self, data):
-        print 'Processing stats'
+        print ('Processing stats')
         return
         for name, stats in data:
-            print '[', name, ']'
+            print ('[{}]'.format (name))
             for h in stats:
                 if stats [h].newFlow:
-                    print 'new*', stats [h].pkt_cnt_total, stats [h].pkt_cnt_win
+                    print ('new*', stats [h].pkt_cnt_total, stats [h].pkt_cnt_win)
                 elif stats [h].newStat:
-                    print '    ', stats [h].pkt_cnt_total, stats [h].pkt_cnt_win
+                    print ('    ', stats [h].pkt_cnt_total, stats [h].pkt_cnt_win)
                 else:
-                    print 'all done'
+                    print ('all done')

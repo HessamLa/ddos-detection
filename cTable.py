@@ -1,4 +1,5 @@
 import numpy as np
+import itertools
 from image_output import ImageOutput
 
 def entropy (a): # a in a numpy array
@@ -16,20 +17,17 @@ class tableEntry:
     def add (self, pktCnt, pktLen):
         self.pkt_cnt += pktCnt
         self.pkt_len += pktLen
-
+        
 class entropyTable:
     def __init__ (self, id=0, name=None):
         self.id = id
         self.name = name
         self.tbl = dict ()
 
-    def __setitem__(self, i, data):
-        self.tbl [i] = tableEntry ()
-
     def __getitem__ (self, i):
         return self.tbl [i]
-    
-    def update (self, i, pkt_cnt=0, pkt_len=0):
+
+    def update (self, i, pkt_cnt=0, pkt_len=0): # update i-th entry
         if i not in self.tbl:
             self.tbl [i] = tableEntry (pkt_cnt, pkt_len)
         else:
@@ -37,19 +35,23 @@ class entropyTable:
 
     def clear (self):
         self.tbl.clear()
-    
+        
     def entropy (self): # calculate entropy of each column in self.tbl, array of entropies
         # convert dictionary to numpy array
-        array=np.array([[val.pkt_cnt, val.pkt_len] for (key,val) in self.tbl.iteritems()], dtype='f')
+        if ( len (self.tbl) == 0 ):
+            return np.array ([0,0])
+        
+        array=np.array([[val.pkt_cnt, val.pkt_len] for (key,val) in self.tbl.items()], dtype='f')
         
         p = array/array.sum (axis=0) # divide each cell by sum of its column
         # plogp = -np.multiply (p, np.log (p))
-        logp = np.where(p>0, np.log(p), 0)
+        # logp = np.where(p>0, np.log(p), 0)
+        logp = np.log(p)
         plogp = -np.multiply (p, logp)
-        return plogp.sum (axis=0)
+        return plogp.sum (axis=0) # sum over columns, and return a list of entries
 
     def printInfo (self):
-        print 'Table: {:12}. {:4} Entries. Entropy={}'.format (self.name, len (self.tbl), self.entropy ())
+        print ('Table: {:12}. {:4} Entries. Entropy={}'.format (self.name, len (self.tbl), self.entropy ()))
 
 class cTable:
     def __init__ (self):
@@ -66,7 +68,7 @@ class cTable:
             }
         self.history = [] # list of entropies
         self.image_output = ImageOutput ()
-        print 'New cTable created'
+        print ('New cTable created')
 
     def reinit (self):
         for t in self.table:
@@ -81,7 +83,7 @@ class cTable:
                 self.table[self.sip].update ( hash (stats[s].SrcIp), pkt_cnt, pkt_len)
                 self.table[self.dip].update ( hash (stats[s].DstIp), pkt_cnt, pkt_len)
                 self.table[self.sp]. update ( stats[s].SrcPrt, pkt_cnt, pkt_len)
-                self.table[self.dp]. update ( stats[s].SrcPrt, pkt_cnt, pkt_len)
+                self.table[self.dp]. update ( stats[s].DstPrt, pkt_cnt, pkt_len)
         elif data:
             for [name, stats] in data:
                 for s in stats:
@@ -91,11 +93,13 @@ class cTable:
                     self.table[self.sip].update ( hash (stats[s].SrcIp), pkt_cnt, pkt_len)
                     self.table[self.dip].update ( hash (stats[s].DstIp), pkt_cnt, pkt_len)
                     self.table[self.sp]. update ( stats[s].SrcPrt, pkt_cnt, pkt_len)
-                    self.table[self.dp]. update ( stats[s].SrcPrt, pkt_cnt, pkt_len)
+                    self.table[self.dp]. update ( stats[s].DstPrt, pkt_cnt, pkt_len)
 
+        if (len (self.history) > 20):
+            self.history.pop(0)
         self.history.append ( self.getEntropy() )
 
-    def getEntropy (self, tableId=0, tableName=None):
+    def getEntropy (self, tableId=None, tableName=None):
         # If a specific tableId or tableName is requested, then return 1-D array of entropy.
         # Otherwise, return all entropies in a dictionary.
         if (tableId):
@@ -117,11 +121,18 @@ class cTable:
         return e
         
     def printInfo (self):
-        print 'cTable info:'
+        print ('cTable info:')
         for t in self.table:
             self.table [t].printInfo ()
-        print ''
+        print ('')
 
     def drawEntropy (self):
-        self.image_output.draw (self.history)
+        # h = self.history[-1]
+        # data = [] # will contain (name,value) tuples
+        # for e in h:
+        #     (id, name, entropy) = h[e]
+            
+        #     data.append ()
+        
+        self.image_output.draw (self.history[-1])
         
