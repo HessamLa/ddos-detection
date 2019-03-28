@@ -1,10 +1,12 @@
 #!/usr/bin/env py3
+import getopt
 import time
 import numpy as np
 import os
 import sys
 import matplotlib.pyplot as plt
 import dpkt
+from utilities import eprint
 
 
 sys.path.append(".")
@@ -16,10 +18,10 @@ from cTable import cTable
 
 
 class Simulator:
-    def __init__ (self, dirpath='.', timewin=5.0, filter='switch', protocol=''): # protocol is a comma-separted list
+    def __init__ (self, dirpath='.', timewin=5.0, filterstr='switch', protocol=''): # protocol is a comma-separted list
         self.timewin = float(timewin) # SImulation time window in seconds. In each window, the packets will be analyzed
 
-        files = [f for f in os.listdir (dirpath) if f.endswith ('pcap') and f.find (filter) != -1 ]
+        files = [f for f in os.listdir (dirpath) if f.endswith ('pcap') and f.find (filterstr) != -1 ]        
         self.switches = dict()
         self.controller = Controller ()
         self.ctable = cTable()
@@ -72,15 +74,51 @@ class Simulator:
         # print ("PRESS SOME KEY TO TERMINATE")
         # os.system("pause")
 
-        
+def parse_arguments (argv):
+    inputdir = "pcap_small"
+    inputdir = "pcap"
+    inputdir = "ds-ns3"
+    # inputdir = "/home/datasets/caida/ddos-20070804"
+    inputdir = "/tmp/hessamla/"
+
+    timewin = 60
+    
+    usage_msg = 'Usage: {} <inputfile> -o <csv-outputfile>'.format (argv[0])
+    try:
+        opts, args = getopt.getopt(argv[1:],"hd:t:",["help", "idir=", "timewin="])
+    except getopt.GetoptError:
+        eprint ('ERR: Problem reading arguments.')
+        eprint (usage_msg)
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            eprint (usage_msg)
+            eprint ("-h (--help)                   Prints this help")
+            eprint ("-d (--idir) <pcap-directory>  Directory containing PCAP files")
+            eprint ("-t (--timewin) <seconds>      Width of each time window in seconds")
+            sys.exit()
+        elif opt in ("-d", "--idir"):
+            inputdir = arg
+        elif opt in ("-t", "--timewin"):
+            timewin = arg
+    # if (len (args) > 0):
+    #     inputfile = args[-1]
+    else:
+        eprint ('WARN: No arguments are passed. Using default values:')
+        eprint ('inputdir =', inputdir)
+        eprint ('time window =', timewin , 'seconds')
+        eprint (usage_msg)
+        eprint ("")
+
+    return inputdir, timewin
 
 if __name__ == "__main__":
     # os.path.join(path, 'train-images-idx3-ubyte')
     # print (flow_ind)
     # print (iSrcIP, iDstIP, iProto, iSrcprt, iDstPrt)
 
-    filename = 'ais_ddos_switchPorts1-0-0.csv'
-    filepath = os.path.join('.', filename)
+    # filename = 'ais_ddos_switchPorts1-0-0.csv'
+    # filepath = os.path.join('.', filename)
         
     # sw = Switch_Class (filepath)
     # sw.analyze()
@@ -94,13 +132,12 @@ if __name__ == "__main__":
         # l = pcap_reader.get_next_packet()
         # print (l)
     # exit()
+    inputdir, timewin = parse_arguments (sys.argv)
 
-    dirpath = "pcap_small"
-    dirpath = "pcap"
-    dirpath = "ds-ns3"
-    # dirpath = "/home/datasets/caida/ddos-20070804"
-    sim = Simulator (dirpath=dirpath, timewin=10, filter='',\
-        protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP})
+    sim = Simulator (dirpath=inputdir, timewin=timewin,\
+        filterstr='switch',\
+        protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP}\
+        )
         # protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP})
     sim.run()
     # while (True):
@@ -110,3 +147,5 @@ if __name__ == "__main__":
     # print ([packets[1][i] for i in flow_ind])
     # print (str ([packets[1][iSrcIP], packets[1][iDstIP], packets[1][iProto], packets[1][iSrcprt], packets[1][iDstPrt]]))
     # print ( [ hash(str(packets[i])) for i in range (len(packets))])
+    input()
+    

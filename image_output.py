@@ -46,7 +46,7 @@ class ImageOutput:
         # print (x, entropies)
         # self.ax.scatter (x, entropies,marker='.', label=names, facecolor=color)
             
-        self.i += 2
+        self.i += 1
         self.ax.set_xlim ((-50+self.i,2+self.i), auto=False) # set width of the x axis
         
         # self.ax.legend ()
