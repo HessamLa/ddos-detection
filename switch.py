@@ -8,9 +8,13 @@ from pcapstream import *
 from dpkt_pcap_parser import Parser
 import time
 
-from utilities import eprint
+from structures import FTDObj
 
-from structures import Stats
+from utilities import eprint
+from utilities import HashCollection
+
+from flowTable import FlowEntry
+from flowTable import FlowTable
 
 def Parse_Csv (filepath):
     def conv(s):
@@ -42,34 +46,45 @@ def Parse_Csv (filepath):
 
     return packets, [iTime, iSrcIp, iDstIp, iProto, iSrcPrt, iDstPrt, iTtl, iFrameLen]
 
+
 class Switch_Class:
     def __init__ (self, id=0, name=None):
         eprint ('New switch Initiated.  ID: {}   name: {}'.format (id, name))
         self.name = name
         self.id = id
-
-        self.flows = dict()
         
         self.next_pkt_id = 0 # ID of the next immediate packet not processed so far. Note the first row of packets is for columns labels
 
-        self.stats = dict()
+        self._ftable = FlowTable (id=self.id, name=self.name)
+        return
 
     def update_properties (self, timewin=None):
         if timewin: self.timewin = timewin
+        return
 
     def send_packets (self, packets): # this method sends packets to the controller
         self.packets = packets
-        self.__process__ (packets)
-        
-    def get_stats (self):
-        return self.stats
+        self.__process (packets)
+        return
+
+    @property
+    def flow_table (self):
+        # return self.__flows
+        return self._ftable
+
+    @flow_table.setter
+    def flow_table (self, ftbl):
+        # self.__flows = ftbl
+        self._ftable = ftbl
+        return
 
     def reinit (self):
-        # Remove all stat entries
-        self.stats.clear ()
-        self.flows.clear ()
+        """Reset flags of all current entries
+        """
+        for flow in self._ftable:
+            flow.reset ()
     
-    def __process__ (self, packets=None):
+    def __process (self, packets=None):
         # # All previous stats must be marked as old
         # for h in self.stats:
         #     self.stats [h].reinit_window()
@@ -78,79 +93,91 @@ class Switch_Class:
             eprint ('No more packets left to process')
             return
 
-        self.newflows = dict() # Initialize the newflows dictionary. If there is any new
-        
         for p in packets:
             # print (p)
             h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
-            if h in self.flows:
-                self.flows [h].append (p)
+
+            if h not in self._ftable.keys():
+                self._ftable [h] = FlowEntry(h, p)
             else:
-                self.flows [h] = [p]
-                self.newflows [h] = [p]
-                self.stats [h] = Stats(h, p)
-    
-            self.stats [h].analyze (p)
-        
-        # for h in self.stats:
-        #     if (not self.stats [h].newStat): # remove old stat entries
-        #         self.stats.pop (h, None)
+                self._ftable [h].add (ts=p.ts, difCnt=1, difLen=p.len)
 
 class Switch_Driver:
     switchCount = 0
-    def __init__ (self, filename, dirpath='.', timewin=10.0, protocol_include=None): # protocol is a comma-separted list
+    def __init__ (self, filename, filetype, dirpath='.', timewin=10.0, protocol_include=None): # protocol is a comma-separted list
         Switch_Driver.switchCount += 1
 
         self.protocols = None 
         if (protocol_include):
             self.protocols = protocol_include
         eprint ("Switch driver initiated. ID: ", Switch_Driver.switchCount,\
-                "Protocols: ", self.protocols)
+                "Protocols: ", self.protocols,
+                "Source Type:", filetype)
+        
         self.switch =  Switch_Class(id=Switch_Driver.switchCount, name=filename)
 
         self.filename=filename
+        self.filetype=filetype
         filepath = os.path.join(dirpath, filename)
         # run_tshark='/home/hessamla/ddos-detection/pcap2csv/run-tshark'
         # self.pcap_reader = TShark_Pcap2CSV (run_tshark, filepath)
         # self.pcap_reader = TCPDump_Pcap2CSV (filepath, flags='')
         # self.pcap_reader = dpkt_pcap2csv (filepath)
         # self.pcap_reader = dpkt_pcap2pkt (filepath)
-        self.pcap_reader = dpkt_pcap2obj (filepath)
-        
-
-        self.p = self.pcap_reader.get_next_packet () # next packet to be processed in the system
-        self.next_pkt_id = 1 # 0th row of the file is expected to be column names
         self.timewin = float (timewin)
-        self.time = sys.float_info.max
-        if (self.p):
-            self.time = float (self.p.ts) # time of the first packet
-        
+        self.time = 0.0
+
+        if (self.filetype == 'pcap'):
+            self.pcap_reader = dpkt_pcap2obj (filepath)
+            
+            self.p = self.pcap_reader.get_next_packet () # next packet to be processed in the system
+            self.next_pkt_id = 1 # 0th row of the file is expected to be column names
+            self.time = sys.float_info.max
+            if (self.p):
+                self.time = float (self.p.ts) # time of the first packet
+        elif (self.filetype == 'ftd'):
+            self.ftable_img_reader = ftd_2flowtable (filepath)
+
+        self._done=False            
         # eprint ("{0} {1} {2}".format(self.filename, self.time, self.p))
+        return
 
-    def adjustTime (self):
-        if (self.p):
-            t = self.p.ts # time of the first packet
-        while self.time + self.timewin < t:
-            self.time += self.timewin
-
-    def finished (self):
-        if self.p==None:
-            return True
-        else:
-            return False
+    @property
+    def is_done (self):
+        return self._done
 
     def progress (self, timewin=None):
-        if (self.p == None):
+        if (self._done == True):
             # eprint ('No more packets left to progress:', self.filename)
             return
         if timewin:
             self.timewin = float (timewin)
+        
         self.switch.reinit()
         
+            
+        if (self.filetype == 'pcap'):
+            # packets = self._read_pcaps()
+            for packets in self._read_pcaps():
+                self.switch.send_packets (packets=packets)
+                # eprint ('{} @{:.2f}   from {} to {}'. format (self.filename, t, self.next_pkt_id, i))
+                self.next_pkt_id += len (packets)
+
+            self.time += self.timewin
+        elif (self.filetype == 'ftd'):
+            dumptype, self.protocols, self.timewin, self.time, ftable = \
+                self.__read_ftable ()
+
+            if (dumptype==FTDObj.DumpType.NEW_FLOWTABLE): # update the flowtable if there is a change.
+                self.switch.flow_table = ftable
+
+        return
+
+    def _read_pcaps (self):
         #  eprint (self.filename, 'continuing from time', t)
         packets=[]
-        t=-1 # COMMENT OUT
-        packetscount=0
+        totalcnt = 0
+        # t=-1 # COMMENT OUT
         # str = "{}".format(self.p .ts) # COMMENT OUT
         t0 = time.time()
         while (self.p and (self.p .ts - self.time) < self.timewin):
@@ -159,24 +186,31 @@ class Switch_Driver:
             elif (self.p.proto in self.protocols): # Otherwise, accept only the recognized packets
                 # print (self.protocols, self.p.proto, self.p.sport, self.p.dport)
                 packets.append (self.p)
-            t = self.p.ts - self.time # COMMENT OUT
+            # t = self.p.ts - self.time # COMMENT OUT
             self.p = self.pcap_reader.get_next_packet()
-            
-            # if (None and len (packets) >= 100000):  # If number of packets is too much, send this batch to the switch and restart
-            #     self.switch.send_packets (packets=packets)
-            #     packetscount += len (packets)
-            #     packets = []
+            if (len(packets) > 100000):
+                totalcnt += len (packets)
+                # print (totalcnt)
+                
+                yield packets
+                packets = []
+        if (self.p==None): self._done = True
+
         t1 = time.time()
         dif = t1-t0
 
-        packetscount += len (packets)
-        eprint (self.filename, "|Pkt Cnt:", len(packets), '|time diff:', "{:.3f}".format(t)) # COMMENT OUT
+        totalcnt += len (packets)
+        if (totalcnt > 1):
+            print (self.filename, "|Pkt Cnt:", totalcnt, '|exec time diff:', "{:.3f}".format(dif)) # COMMENT OUT
         if dif > 1:
             RED='\033[0;31m'
             NC='\033[0m' # No Color
-            eprint (RED, '    Time elapsed:', dif, NC)
+            print (RED, '    Time elapsed:', dif, NC)
+        
+        yield packets
 
-        self.switch.send_packets (packets=packets)
-        # eprint ('{} @{:.2f}   from {} to {}'. format (self.filename, t, self.next_pkt_id, i))
-        self.next_pkt_id += packetscount
-        self.time += self.timewin
+    def __read_ftable (self):
+        obj = self.ftable_img_reader.get_next_shot ()
+        # dumptype, protocols, timewin, time, flow_table = FTDObj.unpack_obj (obj)
+        return FTDObj.unpack_obj (obj)
+

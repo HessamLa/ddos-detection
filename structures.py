@@ -1,72 +1,8 @@
-class Stats:
-    def __init__ (self, hashCode, p, labels_indices=[1,2,3,4,5,6,7,8]):
-        self.newStat = True # True, if this stat has been modified then 
-        self.newFlow = True # True, if this is created for a new flow entry
+from abc import abstractmethod
+from enum import Enum
+from utilities import eprint
+import copy
 
-        #initialize labels
-        self.iTime   = labels_indices [0]
-        self.iSrcIp  = labels_indices [1] 
-        self.iDstIp  = labels_indices [2]
-        self.iProto  = labels_indices [3]
-        self.iSrcPrt = labels_indices [4]
-        self.iDstPrt = labels_indices [5]
-        self.iTtl    = labels_indices [6]
-        self.iFrameLen = labels_indices [7]
-
-        self.flowHash = hashCode
-        self.time   = p.ts  # records latest modifcation time of this Stat entry
-        self.SrcIp  = p.sip
-        self.DstIp  = p.dip
-        self.Proto  = p.proto
-        self.SrcPrt = p.sport
-        self.DstPrt = p.dport
-        self.Ttl    = p.ttl
-        self.FrameLen = p.len
-        self.pkt_cnt_total     = 0
-        self.sum_pkt_len_total = 0
-
-        self.pkt_cnt_win     = 0
-        self.sum_pkt_len_win = 0
-        self.pkt_len_avg_win = 0
-
-        self.req_freq        = None # Request frequency
-        self.req_phase_shift = None # Request phase shift
-    
-    def reinit_window (self):
-        self.newStat = False
-        self.newFlow = False
-        self.pkt_cnt_win     = 0
-        self.sum_pkt_len_win = 0
-        self.pkt_len_avg_win = 0
-
-    def analyze (self, p):
-        self.newStat = True
-        self.pkt_cnt_total += 1
-        self.pkt_cnt_win += 1
-        self.sum_pkt_len_win += p.len 
-        self.sum_pkt_len_total += p.len
-        self.time = p.ts
-
-    def printInfo (self):
-        print (self.newStat )
-        print (self.newFlow )
-
-        print (self.flowHash )
-        print (self.SrcIp)
-        print (self.DstIp  )
-        print (self.Proto  )
-        print (self.SrcPrt )
-        print (self.DstPrt )
-        print (self.pkt_cnt_total    )
-        print (self.sum_pkt_len_total)
-
-        print (self.pkt_cnt_win     )
-        print (self.sum_pkt_len_win )
-        print (self.pkt_len_avg_win )
-
-        print (self.req_freq)
-        print (self.req_phase_shift )
-    
 class ip_packet():
     def __init__ (self):
         self.ts    = 0
@@ -77,3 +13,77 @@ class ip_packet():
         self.dport = 0
         self.len   = 0
         self.ttl   = 0
+
+class AssociativeEntry:
+    def __init__ (self, key=None, dirty=None, age=None):
+        """The variables 'key' 'dirty' and 'age' will be included in each object
+        if they are passed as an argument"""
+        if (key != None):
+            self.key=key
+        if (dirty != None):
+            self.dirty=dirty # Dirty flag. True, if this entry has been modified
+        if (age != None):
+            self.age=age
+        return
+
+    @abstractmethod
+    def reset (self):
+        pass
+
+    def copy (self):
+        return copy.copy (self)
+    
+class AssociativeTable:
+    def __init__ (self, id=0, name=None):
+        self.id=id
+        self.name = name
+        self._tbl = dict ()
+        return
+
+    def __getitem__ (self, h):
+        return self._tbl [h]
+
+    def __setitem__ (self, h, entry):
+        self._tbl [h] = entry
+        return
+
+    def __iter__ (self):
+        for h in self._tbl:
+            yield self._tbl[h]
+
+    def keys (self):
+        """Returns keys for all entries"""
+        return self._tbl.keys()
+
+    def reset (self):
+        """Reset flag of every flow in this table."""
+        for f in self:
+            f.reset ()
+        return
+
+class FTDObj: # Flow Table Dump Obj
+    def __init__ (self):
+        return
+    class DumpType (Enum):
+        NEW_FLOWTABLE=1
+        NO_FLOWTABLE_CHANGE=2
+        NONE=3
+
+    @classmethod
+    def pack_obj (cls, dumptype, protocols, timewin, time, flow_table):
+        """ The input are protocols, timewin, time, flow_table which
+        pertain to a switch-driver
+        returns obj = [protocols, timewin, time, flow_table]
+        """
+        obj = [dumptype, protocols, timewin, time, flow_table]
+        return obj
+    @classmethod
+    def unpack_obj (cls, obj):
+        """ The input is an obj which pertain to a switch-driver state
+        [protocols, timewin, time, flow_table] = obj
+        return protocols, timewin, time, flow_table
+        """
+
+        [dumptype, protocols, timewin, time, flow_table] = obj
+        return dumptype, protocols, timewin, time, flow_table
+

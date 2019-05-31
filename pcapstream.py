@@ -3,13 +3,29 @@ from utilities import eprint
 from utilities import ipStr2Hex
 from structures import ip_packet
 from dpkt_pcap_parser import Parser
+import pickle
+
+class ftd_2flowtable:
+    def __init__ (self, ftdfilepath):
+        self.file = ftdfilepath
+        self.f=open(ftdfilepath, 'rb')
+        if (self.f is None):
+            eprint ("ERR Openning FTD file", ftdfilepath)
+        return
+    def get_next_shot (self):
+        try:
+            t=pickle.load(self.f)
+        except EOFError:
+            exit()
+        return t
 
 class dpkt_pcap2obj:
     def __init__ (self, pcapfilepath):
-        self.p = Parser (pcapfilepath)
+        self.parser = Parser (pcapfilepath)
         return
-    def get_next_packet (self):
-        return self.p.getnext('pkt')
+    def get_next_packet (self, count=1):
+        # return self.parser.getnext('pkt')
+        return self.parser.getnext_pkt (count)
         
 class dpkt_pcap2pkt:
     def __init__ (self, pcapfilepath):
@@ -175,9 +191,9 @@ class TCPDump_Pcap2CSV:
             except:
                 p[self.iFrameLen] = 0
         except:
-            print ("Exception occured")
-            print ("Input line:{}".format(line))
-            print ("Parsed:{}".format(p))
+            eprint ("Exception occured")
+            eprint ("Input line:{}".format(line))
+            eprint ("Parsed:{}".format(p))
             raw_input("Press the <ENTER> key to continue...")
         return p
 

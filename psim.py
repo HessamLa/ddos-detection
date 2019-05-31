@@ -18,10 +18,10 @@ from cTable import cTable
 
 
 class Simulator:
-    def __init__ (self, dirpath='.', timewin=5.0, filterstr='switch', protocol=''): # protocol is a comma-separted list
+    def __init__ (self, idir='.', timewin=5.0, filterstr='', filetype='pcap', protocol=''): # protocol is a comma-separted list
         self.timewin = float(timewin) # SImulation time window in seconds. In each window, the packets will be analyzed
 
-        files = [f for f in os.listdir (dirpath) if f.endswith ('pcap') and f.find (filterstr) != -1 ]        
+        files = [f for f in os.listdir (idir) if f.endswith (filetype) and f.find (filterstr) != -1 ]        
         self.switches = dict()
         self.controller = Controller ()
         self.ctable = cTable()
@@ -31,7 +31,7 @@ class Simulator:
         times=[]
         for f in files: # FOREACH switch-csv file, read the file and create corresponding switch obj
             # Make a switch object
-            sd = Switch_Driver (f, dirpath, self.timewin, protocol)
+            sd = Switch_Driver (f, filetype, idir, self.timewin, protocol)
             
             # for each switch-csv file make a switch
             self.switches [f] = sd
@@ -41,8 +41,10 @@ class Simulator:
             self.controller.connect_switches ([sd.switch])
         
         # readjust time of all switches to the earliest one
+        basetime = int (min (times)/timewin)*timewin
+        print ("Base Time:", basetime)
         for sd in self.switches:
-            self.switches[sd].time = min (times)
+            self.switches[sd].time = basetime
 
     def run(self):
         it = 0
@@ -57,21 +59,23 @@ class Simulator:
             self.controller.progress ()
             
             # get controller data and pass it to ctable
-            self.ctable.reinit () # remove all data in this table
-            data = self.controller.get_data ()
-            self.ctable.update (data=data)
+            # data = self.controller.get_data ()
+            ftbl_all = self.controller.get_ftbl_all ()
+            # self.ctable.reinit () # remove all data in this table
+            # self.ctable.update (data=data)
+            self.ctable.update (flows=ftbl_all)
             self.ctable.printInfo ()
             self.ctable.drawEntropy ()
 
             # if all switches are done getting new packets, then 
             alldone = True
             for d in self.switches:
-                if self.switches[d].finished () == False:
+                if self.switches[d].is_done == False:
                     alldone = False
 
         # finalize
         # raw_input ("PRESS SOME KEY TO TERMINATE")
-        # print ("PRESS SOME KEY TO TERMINATE")
+        eprint ("PRESS SOME KEY TO TERMINATE")
         # os.system("pause")
 
 def parse_arguments (argv):
@@ -80,12 +84,18 @@ def parse_arguments (argv):
     inputdir = "ds-ns3"
     # inputdir = "/home/datasets/caida/ddos-20070804"
     inputdir = "/tmp/hessamla/"
+    inputtype = "pcap"
+    outputdir = "/home/hessamla/ddos-detection/captures_netshot/"
+
+    inputdir = "/home/hessamla/ddos-detection/captures_netshot/"
+    inputtype = "ftd" #Flow-Table Dump
+    outputdir = ""
 
     timewin = 60
     
-    usage_msg = 'Usage: {} <inputfile> -o <csv-outputfile>'.format (argv[0])
+    usage_msg = 'Usage: {} -df <input-directory> -o <output-ftd-dirctory>'.format (argv[0])
     try:
-        opts, args = getopt.getopt(argv[1:],"hd:t:",["help", "idir=", "timewin="])
+        opts, args = getopt.getopt(argv[1:],"hcd:f:t:o:",["help", "pcapdir=", "ftddir", "timewin=", "odir"])
     except getopt.GetoptError:
         eprint ('ERR: Problem reading arguments.')
         eprint (usage_msg)
@@ -94,23 +104,32 @@ def parse_arguments (argv):
         if opt in ("-h", "--help"):
             eprint (usage_msg)
             eprint ("-h (--help)                   Prints this help")
-            eprint ("-d (--idir) <pcap-directory>  Directory containing PCAP files")
+            eprint ("-d (--pcapdir) <pcap-directory>  Directory containing PCAP files")
+            eprint ("-f (--ftddir) <ftd-directory>   Directory containing Flow-Table Dump files")
             eprint ("-t (--timewin) <seconds>      Width of each time window in seconds")
             sys.exit()
-        elif opt in ("-d", "--idir"):
+        elif opt in ("-d", "--pcapdir"):
             inputdir = arg
+            inputtype = "pcap"
+        elif opt in ("-f", "--ftddir"):
+            inputdir = arg
+            inputtype = "ftd"
+        elif opt in ("-o", "--odir"):
+            outputdir = arg
         elif opt in ("-t", "--timewin"):
-            timewin = arg
+            timewin = float (arg)
     # if (len (args) > 0):
     #     inputfile = args[-1]
     else:
-        eprint ('WARN: No arguments are passed. Using default values:')
-        eprint ('inputdir =', inputdir)
-        eprint ('time window =', timewin , 'seconds')
-        eprint (usage_msg)
-        eprint ("")
+        eprint ('WARN: No arguments are passed. Using default values.')
+    
+    eprint ('Input Directory =', inputdir)
+    eprint ('Input Type =', inputtype)
+    eprint ('NetShot outputdir =', outputdir)
+    eprint ('Time Window =', timewin , 'seconds')
+    eprint ("")
 
-    return inputdir, timewin
+    return inputdir, outputdir, inputtype, timewin
 
 if __name__ == "__main__":
     # os.path.join(path, 'train-images-idx3-ubyte')
@@ -132,10 +151,12 @@ if __name__ == "__main__":
         # l = pcap_reader.get_next_packet()
         # print (l)
     # exit()
-    inputdir, timewin = parse_arguments (sys.argv)
+    idir, outputdir, inputtype, timewin = parse_arguments (sys.argv)
 
-    sim = Simulator (dirpath=inputdir, timewin=timewin,\
-        filterstr='switch',\
+    print (idir, outputdir,inputtype, timewin)
+    sim = Simulator (idir=idir, timewin=timewin,\
+        filterstr='',\
+        filetype=inputtype,\
         protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP}\
         )
         # protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP})
@@ -147,5 +168,7 @@ if __name__ == "__main__":
     # print ([packets[1][i] for i in flow_ind])
     # print (str ([packets[1][iSrcIP], packets[1][iDstIP], packets[1][iProto], packets[1][iSrcprt], packets[1][iDstPrt]]))
     # print ( [ hash(str(packets[i])) for i in range (len(packets))])
+    print ("Enter")
     input()
+    
     

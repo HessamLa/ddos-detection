@@ -2,6 +2,12 @@ import numpy as np
 import itertools
 from image_output import ImageOutput
 
+from entropyTable import EntropyTable
+
+from utilities import eprint
+from utilities import HashCollection
+import copy
+
 def entropy (a): # a in a numpy array
     p = a/a.sum () # divide each cell by sum of its column
     # plogp = -np.multiply (p, np.log (p))
@@ -9,121 +15,111 @@ def entropy (a): # a in a numpy array
     plogp = -np.multiply (p, logp)
     return plogp.sum()
 
-class tableEntry:
-    def __init__ (self, pkt_cnt=0, pkt_len=0):
-        self.pkt_cnt = pkt_cnt # total number of packets
-        self.pkt_len = pkt_len # total sum of packet sizes
 
-    def add (self, pktCnt, pktLen):
-        self.pkt_cnt += pktCnt
-        self.pkt_len += pktLen
-        
-class entropyTable:
-    def __init__ (self, id=0, name=None):
-        self.id = id
-        self.name = name
-        self.tbl = dict ()
-
-    def __getitem__ (self, i):
-        return self.tbl [i]
-
-    def update (self, i, pkt_cnt=0, pkt_len=0): # update i-th entry
-        if i not in self.tbl:
-            self.tbl [i] = tableEntry (pkt_cnt, pkt_len)
-        else:
-            self.tbl [i].add (pkt_cnt, pkt_len)
-
-    def clear (self):
-        self.tbl.clear()
-        
-    def entropy (self): # calculate entropy of each column in self.tbl, array of entropies
-        # convert dictionary to numpy array
-        if ( len (self.tbl) == 0 ):
-            return np.array ([0,0])
-        
-        array=np.array([[val.pkt_cnt, val.pkt_len] for (key,val) in self.tbl.items()], dtype='f')
-        
-        p = array/array.sum (axis=0) # divide each cell by sum of its column
-        # plogp = -np.multiply (p, np.log (p))
-        # logp = np.where(p>0, np.log(p), 0)
-        logp = np.log(p)
-        plogp = -np.multiply (p, logp)
-        return plogp.sum (axis=0) # sum over columns, and return a list of entries
-
-    def printInfo (self):
-        print ('Table: {:12}. {:4} Entries. Entropy={}'.format (self.name, len (self.tbl), self.entropy ()))
-
-class cTable:
+class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
     def __init__ (self):
         self.sip = 1
         self.dip = 2 
         self.sp  = 3
         self.dp  = 4
         
-        self.table = {
-            self.sip: entropyTable (id=self.sip, name='SrcIP'), # Source IP table
-            self.dip: entropyTable (id=self.dip, name='DstIP'), # Destination IP table
-            self.sp : entropyTable (id=self.sp,  name='SrcPrt'), # Source Port table
-            self.dp : entropyTable (id=self.dp,  name='DstPrt'), # Destination Port table
+        self.e_tbls = { # entropy tables
+            self.sip: EntropyTable (id=self.sip, name='SrcIP'),  # Source IP table
+            self.dip: EntropyTable (id=self.dip, name='DstIP'),  # Destination IP table
+            self.sp : EntropyTable (id=self.sp,  name='SrcPrt'), # Source Port table
+            self.dp : EntropyTable (id=self.dp,  name='DstPrt'), # Destination Port table
             }
+
         self.history = [] # list of entropies
         self.image_output = ImageOutput ()
         print ('New cTable created')
 
     def reinit (self):
-        for t in self.table:
-            self.table [t].clear()
+        for t in self.e_tbls:
+            self.e_tbls [t].clear()
     
-    def update (self, switch_name=None, stats=None, data=None):
-        if switch_name and stats:
-            for s in stats:
-                pkt_cnt = stats [s].pkt_cnt_win
-                pkt_len = stats [s].sum_pkt_len_win
+    def aggregate_tables (self, tables, agg_table=None):
+        """ tables is in the format of a dictionary of flow tables. This function, aggeregates flows in
+        the format of entropy table. Only nelwy modifed entries will be taken into
+        account.
+        """
+        if (agg_table==None):
+            agg_table = { # Make a dictionary of EntropyTables, comprising of 4 entries.
+                self.sip: EntropyTable (id=self.sip, name='SrcIP'), # Source IP table
+                self.dip: EntropyTable (id=self.dip, name='DstIP'), # Destination IP table
+                self.sp : EntropyTable (id=self.sp,  name='SrcPrt'), # Source Port table
+                self.dp : EntropyTable (id=self.dp,  name='DstPrt'), # Destination Port table
+                }
+        for [name, flows] in tables:
+            for h in flows.keys():
+                if ( flows [h].dirty ): # get only the modified/new flows
+                    pkt_cnt = flows [h].pkt_cnt
+                    pkt_len = flows [h].pkt_len
+                    if (pkt_cnt==0): eprint (name, "dif_cnt is zero XXXXXXXXXXXXXXXXXXXXXX") # REMOVE LATER
+                    if (pkt_len==0): eprint (name, "dif_len is zero XXXXXXXXX743892 fhs uf")
+                    agg_table[self.sip].add ( flows[h].sip,   pkt_cnt, pkt_len)
+                    agg_table[self.dip].add ( flows[h].dip,   pkt_cnt, pkt_len)
+                    agg_table[self.sp]. add ( flows[h].sport, pkt_cnt, pkt_len)
+                    agg_table[self.dp]. add ( flows[h].dport, pkt_cnt, pkt_len)
+        return agg_table
 
-                self.table[self.sip].update ( hash (stats[s].SrcIp), pkt_cnt, pkt_len)
-                self.table[self.dip].update ( hash (stats[s].DstIp), pkt_cnt, pkt_len)
-                self.table[self.sp]. update ( stats[s].SrcPrt, pkt_cnt, pkt_len)
-                self.table[self.dp]. update ( stats[s].DstPrt, pkt_cnt, pkt_len)
-        elif data:
-            for [name, stats] in data:
-                for s in stats:
-                    pkt_cnt = stats [s].pkt_cnt_win
-                    pkt_len = stats [s].sum_pkt_len_win
+    def update_entropy_table (self, flows, agg_table=None):
+        """ Make entropy table from the input flow table 'flows'"""
+        if (agg_table==None):
+            agg_table = { # Make a dictionary of EntropyTables, comprising of 4 entries.
+                self.sip: EntropyTable (id=self.sip, name='SrcIP'), # Source IP table
+                self.dip: EntropyTable (id=self.dip, name='DstIP'), # Destination IP table
+                self.sp : EntropyTable (id=self.sp,  name='SrcPrt'), # Source Port table
+                self.dp : EntropyTable (id=self.dp,  name='DstPrt'), # Destination Port table
+                }
+        for f in flows:
+            if ( f.dirty ): # get only the modified/new flows
+                pkt_cnt = f.dif_cnt
+                pkt_len = f.dif_len
+                agg_table[self.sip].add ( f.sip,   pkt_cnt, pkt_len)
+                agg_table[self.dip].add ( f.dip,   pkt_cnt, pkt_len)
+                agg_table[self.sp]. add ( f.sport, pkt_cnt, pkt_len)
+                agg_table[self.dp]. add ( f.dport, pkt_cnt, pkt_len)
+        return agg_table    
 
-                    self.table[self.sip].update ( hash (stats[s].SrcIp), pkt_cnt, pkt_len)
-                    self.table[self.dip].update ( hash (stats[s].DstIp), pkt_cnt, pkt_len)
-                    self.table[self.sp]. update ( stats[s].SrcPrt, pkt_cnt, pkt_len)
-                    self.table[self.dp]. update ( stats[s].DstPrt, pkt_cnt, pkt_len)
+    def update (self, flows=None, data=None):
+        # rest all tables
+        self.e_tbls=self.e_tbls
+        for i in self.e_tbls:
+            self.e_tbls [i].reset ()
 
+        if flows:
+            self.e_tbls = self.update_entropy_table (flows, self.e_tbls)
+            
         if (len (self.history) > 20):
             self.history.pop(0)
-        self.history.append ( self.getEntropy() )
+        self.history.append ( self.getEntropies() )
 
-    def getEntropy (self, tableId=None, tableName=None):
-        # If a specific tableId or tableName is requested, then return 1-D array of entropy.
-        # Otherwise, return all entropies in a dictionary.
+    def getEntropies (self, tableId=None, tableName=None):
+        """ If a specific tableId or tableName is requested, then return 1-D array of entropy.
+        Otherwise, return all entropies in a dictionary.
+        """
         if (tableId):
-            for t in self.table:
-                if self.table[t].id==tableId: e = self.table[t].entropy()
+            for t in self.e_tbls:
+                if self.e_tbls[t].id==tableId: e = self.e_tbls[t].entropy()
         elif (tableName):
-            for t in self.table:
-                if self.table[t].name==tableName: e = self.table[t].entropy()
+            for t in self.e_tbls:
+                if self.e_tbls[t].name==tableName: e = self.e_tbls[t].entropy()
         else:
-            # Each entropy dictionay entry is as follows:
-            # | tableId | tableName | [entropies numpy array] |
             e = dict ()
-            for t in self.table:
-                e [self.table[t].id] = (
-                    self.table[t].id,
-                    self.table[t].name,
-                    self.table[t].entropy()
+            for t in self.e_tbls:
+                e [ self.e_tbls[t].id] = (
+                    self.e_tbls[t].id,
+                    self.e_tbls[t].name,
+                    self.e_tbls[t].entropy()
                     )
         return e
         
     def printInfo (self):
         print ('cTable info:')
-        for t in self.table:
-            self.table [t].printInfo ()
+        for t in self.e_tbls:
+            self.e_tbls [t].printInfo ()
+            # self.e_tbls [t].printEntries ()
         print ('')
 
     def drawEntropy (self):

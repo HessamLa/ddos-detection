@@ -9,6 +9,8 @@ import struct
 import json as j
 from structures import ip_packet
 from utilities import eprint
+from utilities import ipStr2Hex
+
 import getopt
 import pickle
 
@@ -61,6 +63,11 @@ class Parser (object):
 
         self.pkt_handler = None
         self.open_pcap (filename)
+
+        self.cache_depth = 100000
+        self.cache = [None for i in range (self.cache_depth)]
+        self.cache_index = 0
+        self.cache_cnt = 0
         return
 
     def open_pcap (self, filename):
@@ -127,6 +134,14 @@ class Parser (object):
         return s
         # return f(next(iter(self)))
 
+    def getnext_pkt (self, count=1):
+        try:
+            p= next(iter(self))
+        except StopIteration:
+            p=None
+            pass
+        return p
+
     def get_str (self, p):
         if p == None:
             return None
@@ -162,9 +177,31 @@ class Parser (object):
         for p in self:
             yield p
 
+    def _fill_cache (self, count):
+        self.cache_cnt = 0
+        for ts, pkt in self.pcap:
+            buf = self.pkt_handler (ts, pkt, self)
+            if buf == None:
+                return
+            elif buf == SKIP_PACKET:
+                continue
+            else:
+                self.cache[self.cache_cnt] = buf
+                self.cache_cnt += 1
+                if self.cache_cnt >= count:
+                    return
+        return
+
     def __iter__ (self):
         # ts, pkt = next(self.pcap)
         # while 1:
+
+        # if (self.cache_index < len (self.cache)):
+        #     yield self.cache [self.cache_index]
+        #     self.cache_index += 1
+        # else: # fill the cache
+        #     self.fill_cache (self.cache_depth):
+        
         for ts, pkt in self.pcap:
             buf = self.pkt_handler (ts, pkt, self)
             if buf == None:
