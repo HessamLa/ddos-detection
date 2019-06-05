@@ -77,14 +77,22 @@ class FlowTable (AssociativeTable):
     # def keys_modified (self):
     #     """Returns keys for modified entries only"""
 
-    def add_entry (self, p):
+    def add_packet (self, p):
         h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
         
         if h not in self._tbl:
             self._tbl [h] = FlowEntry(h, p)
         else:
-            self._tbl [h].add (p)
+            self._tbl [h].add (p.ts, 1, p.len)
         return
+
+    def add_table (self, t):
+        for h in t.keys():
+            if h not in self.keys():
+                self[h] = t[h].copy()
+            else:
+                self[h].add (t[h].ts, t[h].dif_cnt, t[h].dif_len)
+        return                
 
     def remove_old (self):
         """Removes old entries"""

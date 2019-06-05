@@ -9,6 +9,7 @@ import dpkt
 import pickle # for srialization
 from utilities import eprint
 from structures import FTDObj
+from flowTable import FlowTable
 sys.path.append(".")
 
 # import locals
@@ -73,17 +74,32 @@ class NetShot:
             for d in self.switches:
                 sd = self.switches [d]
                 sd.progress ()
-                dumptype = FTDObj.DumpType.NO_FLOWTABLE_CHANGE
-                for f in sd.switch.flow_table:
-                    if f.dirty == True:
-                        dumptype = FTDObj.DumpType.NEW_FLOWTABLE
-                        break
                 
-                if dumptype == FTDObj.DumpType.NEW_FLOWTABLE:
-                    obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, sd.switch.flow_table)
-                elif dumptype == FTDObj.DumpType.NO_FLOWTABLE_CHANGE:
-                    obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, None)
-                
+                # dumptype = FTDObj.DumpType.NO_FLOWTABLE_CHANGE
+                # for f in sd.switch.flow_table:
+                #     if f.dirty == True:
+                #         dumptype = FTDObj.DumpType.NEW_FLOWTABLE
+                #         break
+
+                # if dumptype == FTDObj.DumpType.NEW_FLOWTABLE:
+                #     obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, sd.switch.flow_table)
+                # elif dumptype == FTDObj.DumpType.NO_FLOWTABLE_CHANGE:
+                #     obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, None)
+                # TEST ****************************************
+                tmp = FlowTable()
+                ftbl = sd.switch.flow_table
+                if (len (ftbl.keys()) != 0):
+                    dumptype = FTDObj.DumpType.NEW_FLOWTABLE
+                    print ("New FlowTable,", sd.switch.name, "%d entries"%len(ftbl))
+                else:
+                    dumptype = FTDObj.DumpType.NO_FLOWTABLE_CHANGE
+                # for k in ftbl.keys():
+                #     tmp[k] = ftbl[k].copy()
+                # obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, tmp)
+                obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, ftbl)                
+                sd.switch.flow_table.clear()
+                #~Test ****************************************
+
                 self.netshots [d].dump_bin (obj)
             
             # if all switches are done getting new packets, then 

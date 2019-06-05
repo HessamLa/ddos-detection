@@ -15,15 +15,19 @@ class ip_packet():
         self.ttl   = 0
 
 class AssociativeEntry:
-    def __init__ (self, key=None, dirty=None, age=None):
-        """The variables 'key' 'dirty' and 'age' will be included in each object
-        if they are passed as an argument"""
+    def __init__ (self, key=None, dirty=None, age=0, time=None):
+        """The variables 'key' 'dirty' and 'time' will be included in each object
+        if they are passed as an argument.
+        Time is the last"""
         if (key != None):
             self.key=key
         if (dirty != None):
             self.dirty=dirty # Dirty flag. True, if this entry has been modified
         if (age != None):
-            self.age=age
+            self.age=age # Time of last modification
+        if (time != None):
+            self.time=time # Time of last modification
+        
         return
 
     @abstractmethod
@@ -55,6 +59,15 @@ class AssociativeTable:
         """Returns keys for all entries"""
         return self._tbl.keys()
 
+    @property
+    def size (self):
+        """Returns number of elements in this table"""
+        return len (self._tbl)
+
+    def clear (self):
+        self._tbl.clear ()
+        return
+        
     def reset (self):
         """Reset flag of every flow in this table."""
         for f in self:
@@ -83,7 +96,6 @@ class FTDObj: # Flow Table Dump Obj
         [protocols, timewin, time, flow_table] = obj
         return protocols, timewin, time, flow_table
         """
-
         [dumptype, protocols, timewin, time, flow_table] = obj
         return dumptype, protocols, timewin, time, flow_table
 

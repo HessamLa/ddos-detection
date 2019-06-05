@@ -39,10 +39,10 @@ class Controller:
         # for s in self.switches:
         #     self.data.append ([s.name, s.flow_table])
         
-        # # for s in self.switches:
-        # #     ftbl = s.flow_table
+        # for s in self.switches:
+        #     ftbl = s.flow_table
 
-        # self.aggregate_ftables ()
+        self.aggregate_ftables ()
         return
 
     def get_data (self):

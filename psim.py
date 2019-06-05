@@ -42,6 +42,7 @@ class Simulator:
         
         # readjust time of all switches to the earliest one
         basetime = int (min (times)/timewin)*timewin
+        self.current_sim_time = basetime
         print ("Base Time:", basetime)
         for sd in self.switches:
             self.switches[sd].time = basetime
@@ -50,21 +51,28 @@ class Simulator:
         it = 0
         alldone = False
         while (not alldone):
+            self.current_sim_time += self.timewin
             print ('Time: {:.2f} to {:.2f}'.format ( it*self.timewin, (it+1)*self.timewin))
             it += 1
             # all switches run
+            t1 = time.time()
             for d in self.switches:
                 self.switches[d].progress ()
             # controller runs and collects stats from switches
-            self.controller.progress ()
+            t2 = time.time()
+            # self.controller.progress ()
             
             # get controller data and pass it to ctable
             # data = self.controller.get_data ()
             ftbl_all = self.controller.get_ftbl_all ()
+            t3 = time.time()
             # self.ctable.reinit () # remove all data in this table
             # self.ctable.update (data=data)
-            self.ctable.update (flows=ftbl_all)
+            self.ctable.update (ftable=ftbl_all)
+            t4 = time.time()
+            print ('psim.run: tProgress=%.2f ftbl_all=%.2f cTable=%.2f'%(t2-t1,t3-t2, t4-t3))
             self.ctable.printInfo ()
+            entropies = self.ctable.getEntropies ()
             self.ctable.drawEntropy ()
 
             # if all switches are done getting new packets, then 

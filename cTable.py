@@ -1,6 +1,7 @@
 import numpy as np
 import itertools
 from image_output import ImageOutput
+from pcapstream import pickle_write
 
 from entropyTable import EntropyTable
 
@@ -23,6 +24,8 @@ class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
         self.sp  = 3
         self.dp  = 4
         
+        self.pw = None # Pickle Write, for saving entropies into file
+        
         self.e_tbls = { # entropy tables
             self.sip: EntropyTable (id=self.sip, name='SrcIP'),  # Source IP table
             self.dip: EntropyTable (id=self.dip, name='DstIP'),  # Destination IP table
@@ -33,6 +36,12 @@ class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
         self.history = [] # list of entropies
         self.image_output = ImageOutput ()
         print ('New cTable created')
+        return
+
+    def __del__(self):
+        if (self.pw):
+            self.pw.close_file ()
+        return
 
     def reinit (self):
         for t in self.e_tbls:
@@ -66,6 +75,7 @@ class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
     def update_entropy_table (self, flows, agg_table=None):
         """ Make entropy table from the input flow table 'flows'"""
         if (agg_table==None):
+            print ('MAKE NEW AGGREGATING TABLE')
             agg_table = { # Make a dictionary of EntropyTables, comprising of 4 entries.
                 self.sip: EntropyTable (id=self.sip, name='SrcIP'), # Source IP table
                 self.dip: EntropyTable (id=self.dip, name='DstIP'), # Destination IP table
@@ -74,23 +84,25 @@ class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
                 }
         for f in flows:
             if ( f.dirty ): # get only the modified/new flows
-                pkt_cnt = f.dif_cnt
-                pkt_len = f.dif_len
-                agg_table[self.sip].add ( f.sip,   pkt_cnt, pkt_len)
-                agg_table[self.dip].add ( f.dip,   pkt_cnt, pkt_len)
-                agg_table[self.sp]. add ( f.sport, pkt_cnt, pkt_len)
-                agg_table[self.dp]. add ( f.dport, pkt_cnt, pkt_len)
+                dif_cnt = f.dif_cnt
+                dif_len = f.dif_len
+                ts = f.ts
+                agg_table[self.sip].add ( f.sip,   ts, dif_cnt, dif_len)
+                agg_table[self.dip].add ( f.dip,   ts, dif_cnt, dif_len)
+                agg_table[self.sp]. add ( f.sport, ts, dif_cnt, dif_len)
+                agg_table[self.dp]. add ( f.dport, ts, dif_cnt, dif_len)
         return agg_table    
 
-    def update (self, flows=None, data=None):
+    def update (self, ftable=None, data=None):
         # rest all tables
-        self.e_tbls=self.e_tbls
         for i in self.e_tbls:
             self.e_tbls [i].reset ()
 
-        if flows:
-            self.e_tbls = self.update_entropy_table (flows, self.e_tbls)
-            
+        if ftable:
+            self.e_tbls = self.update_entropy_table (ftable, self.e_tbls)
+        
+        self.saveEntropy (self.getEntropies(), 'entropies.dmp')
+
         if (len (self.history) > 20):
             self.history.pop(0)
         self.history.append ( self.getEntropies() )
@@ -98,29 +110,37 @@ class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
     def getEntropies (self, tableId=None, tableName=None):
         """ If a specific tableId or tableName is requested, then return 1-D array of entropy.
         Otherwise, return all entropies in a dictionary.
+        NOTE: The e_table must be reset() before obtaining the e_table.entropy.
         """
         if (tableId):
             for t in self.e_tbls:
-                if self.e_tbls[t].id==tableId: e = self.e_tbls[t].entropy()
+                if self.e_tbls[t].id==tableId: e = self.e_tbls[t].entropy
         elif (tableName):
             for t in self.e_tbls:
-                if self.e_tbls[t].name==tableName: e = self.e_tbls[t].entropy()
+                if self.e_tbls[t].name==tableName: e = self.e_tbls[t].entropy
         else:
             e = dict ()
             for t in self.e_tbls:
                 e [ self.e_tbls[t].id] = (
                     self.e_tbls[t].id,
                     self.e_tbls[t].name,
-                    self.e_tbls[t].entropy()
+                    self.e_tbls[t].entropy
                     )
         return e
         
     def printInfo (self):
         print ('cTable info:')
+        print ('Table:Name  |new/total Entries|Entropy (cnt, len)')
         for t in self.e_tbls:
-            self.e_tbls [t].printInfo ()
+            self.e_tbls[t].printInfo ()
             # self.e_tbls [t].printEntries ()
         print ('')
+
+    def saveEntropy (self, data, filename, outdir='.'):
+        if (self.pw == None):
+            self.pw = pickle_write (filename, outdir=outdir, mode='w+b')
+        self.pw.dump (data)
+        return
 
     def drawEntropy (self):
         # h = self.history[-1]
@@ -131,4 +151,10 @@ class cTable: # SHOULD USE A BETTER NAME FOR THIS CLASS
         #     data.append ()
         
         self.image_output.draw (self.history[-1])
+
+    def dumpEntropy (self, filename=None):
+        if filename == None:
+            filename = 'entropy.dmp'
+        
+
         

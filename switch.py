@@ -64,7 +64,7 @@ class Switch_Class:
 
     def send_packets (self, packets): # this method sends packets to the controller
         self.packets = packets
-        self.__process (packets)
+        self._process (packets)
         return
 
     @property
@@ -84,7 +84,7 @@ class Switch_Class:
         for flow in self._ftable:
             flow.reset ()
     
-    def __process (self, packets=None):
+    def _process (self, packets=None):
         # # All previous stats must be marked as old
         # for h in self.stats:
         #     self.stats [h].reinit_window()
@@ -94,13 +94,15 @@ class Switch_Class:
             return
 
         for p in packets:
-            # print (p)
-            h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
+            # # print (p)
+            # h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
 
-            if h not in self._ftable.keys():
-                self._ftable [h] = FlowEntry(h, p)
-            else:
-                self._ftable [h].add (ts=p.ts, difCnt=1, difLen=p.len)
+            # if h not in self._ftable.keys():
+            #     self._ftable [h] = FlowEntry(h, p)
+            # else:
+            #     self._ftable [h].add (ts=p.ts, difCnt=1, difLen=p.len)
+            # OR WE COULD IMPLEMENT THIS:
+            self._ftable.add_packet (p)
 
 class Switch_Driver:
     switchCount = 0
@@ -136,7 +138,7 @@ class Switch_Driver:
             if (self.p):
                 self.time = float (self.p.ts) # time of the first packet
         elif (self.filetype == 'ftd'):
-            self.ftable_img_reader = ftd_2flowtable (filepath)
+            self.ftable_img_reader = pickle_read (filepath)
 
         self._done=False            
         # eprint ("{0} {1} {2}".format(self.filename, self.time, self.p))
@@ -162,14 +164,27 @@ class Switch_Driver:
                 self.switch.send_packets (packets=packets)
                 # eprint ('{} @{:.2f}   from {} to {}'. format (self.filename, t, self.next_pkt_id, i))
                 self.next_pkt_id += len (packets)
-
             self.time += self.timewin
-        elif (self.filetype == 'ftd'):
-            dumptype, self.protocols, self.timewin, self.time, ftable = \
-                self.__read_ftable ()
 
+        elif (self.filetype == 'ftd'):
+            t1=time.time()
+            dumptype, self.protocols, self.timewin, self.time, ftable = \
+                self._read_ftable ()
+
+            t2=time.time()
+            # CAUTION:
+            # self.switch.flow_table = ftable overwrites the flow table. It is faster and OK with
+            # current requirements, which is only aiming at obtaining entropies and not modifying
+            # the flow table entries. However, the right way to do it is to add ftable to the
+            # existing flow table in the switch using the following which takes longer
+            # self.switch.flow_table.add_table (ftable)
             if (dumptype==FTDObj.DumpType.NEW_FLOWTABLE): # update the flowtable if there is a change.
                 self.switch.flow_table = ftable
+                # self.switch.flow_table.add_table (ftable)
+
+            t3=time.time()
+            if (t3-t1 > 1):
+                print ('switch.progress: tReadFTD=%.2f tAddTbl=%.2f'%(t2-t1, t3-t2))
 
         return
 
@@ -180,7 +195,7 @@ class Switch_Driver:
         # t=-1 # COMMENT OUT
         # str = "{}".format(self.p .ts) # COMMENT OUT
         t0 = time.time()
-        while (self.p and (self.p .ts - self.time) < self.timewin):
+        while (self.p and (self.p.ts - self.time) < self.timewin):
             if ( self.protocols==None ):    # If no protocol is given, then accept all packets
                 packets.append (self.p)
             elif (self.p.proto in self.protocols): # Otherwise, accept only the recognized packets
@@ -208,9 +223,15 @@ class Switch_Driver:
             print (RED, '    Time elapsed:', dif, NC)
         
         yield packets
+        return
 
-    def __read_ftable (self):
-        obj = self.ftable_img_reader.get_next_shot ()
-        # dumptype, protocols, timewin, time, flow_table = FTDObj.unpack_obj (obj)
-        return FTDObj.unpack_obj (obj)
+    def _read_ftable (self):
+        t1 = time.time()
+        obj = self.ftable_img_reader.get_next ()
+        t2 = time.time()
+        # return FTDObj.unpack_obj (obj)
+        dumptype, protocols, twin, t, flow_table = FTDObj.unpack_obj (obj)
+        t3=time.time()
+        print ("switch._read_ftabl: tReadFTD=%.2f tUnpack=%.2f"%(t2-t1, t3-t2))
+        return dumptype, protocols, twin, t, flow_table
 

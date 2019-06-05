@@ -1,6 +1,9 @@
+#!/usr/bin/env py3
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+
+from pcapstream import pickle_read
 
 class ImageOutput:
     def __init__ (self):
@@ -9,6 +12,8 @@ class ImageOutput:
         self.image_name = "Entropy diagram"
         self.initfigure ()
         self.points = dict ()
+
+        self.pr = None # Pickle Read, for reading entropies from file
         
     def initfigure (self):
         plt.rc('legend', fontsize=6)
@@ -56,3 +61,21 @@ class ImageOutput:
     def savefigure (self, filename):
         plt.show()
         self.fig.savefig(filename, dpi=900)
+
+    def getEntropy (self, filepath):
+        if (self.pr == None):
+            self.pr = pickle_read (filepath)
+        return self.pr.get_next ()
+
+if __name__ == "__main__":
+    img = ImageOutput()
+    filepath = './entropies.dmp'
+    pr = pickle_read (filepath)
+    while (True):
+        data = pr.get_next ()
+        img.draw (data)
+
+
+
+
+

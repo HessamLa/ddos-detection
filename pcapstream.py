@@ -5,19 +5,44 @@ from structures import ip_packet
 from dpkt_pcap_parser import Parser
 import pickle
 
-class ftd_2flowtable:
-    def __init__ (self, ftdfilepath):
-        self.file = ftdfilepath
-        self.f=open(ftdfilepath, 'rb')
+class pickle_read:
+    def __init__ (self, filepath):
+        self.file = filepath
+        self.f = open(filepath, 'rb')
         if (self.f is None):
-            eprint ("ERR Openning FTD file", ftdfilepath)
+            eprint ("ERR Openning FTD file", filepath)
         return
-    def get_next_shot (self):
+    def get_next (self):
         try:
-            t=pickle.load(self.f)
+            obj = pickle.load(self.f)
         except EOFError:
             exit()
-        return t
+        return obj
+    
+    def close_file (self):
+        if (self.f != None):
+            self.f.close()
+        return
+
+class pickle_write:
+    def __init__ (self, name, outdir='.', mode='w+b'):
+        self.name = name
+        self.filename = outdir+'/'+name
+        self.f = open(self.filename, mode)
+        if (self.f == None):
+            eprint ("ERR: Failed to open the file", self.filename)
+            raise Exception
+        return
+    
+    def dump (self, obj):
+        # eprint ("Dumping :", self.name)
+        pickle.dump (obj, self.f)
+        return
+    
+    def close_file (self):
+        if (self.f != None):
+            self.f.close()
+        return
 
 class dpkt_pcap2obj:
     def __init__ (self, pcapfilepath):
