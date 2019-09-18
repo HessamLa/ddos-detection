@@ -3,7 +3,103 @@ from structures import AssociativeTable
 from structures import ip_packet
 
 from utilities import eprint
+from utilities import getflowcat
 import math
+
+def make_categoric_ftables (ftbl, cat_method, K=None, categories=None):
+    """Categories:
+    Lg2pktCnt: 0, 1, 2, ... (K-1)+
+    State: new, old, any
+    """
+    _new=0
+    _prv=1
+    _any=2
+    offset_new = _new*K
+    offset_prv = _prv*K
+    offset_any = _any*K
+    
+    method_ids = {"log2pktcnt"   :0,
+                  "log10pktcnt"  :1,
+                  "log2pktlen"   :2,
+                  "log10pktlen"  :3,
+                  "custom_pktcnt":4,
+                  "custom_pktlen":5}
+    cat_method = method_ids [cat_method] # convert from string to corresponding integer
+
+    ftbls = [None for i in range (K*3)]
+    for i in range (0, K):
+      name = "cftbl-new-k"+str(i - _new*K)
+      ftbls[i] = FlowTable (id=i+1, name=name)
+    for i in range (K, K*2):
+      name = "cftbl-prv-k"+str(i - _prv*K)
+      ftbls[i] = FlowTable (id=i+1, name=name)
+    for i in range (K*2, K*3):
+      name = "cftbl-any-k"+str(i - _any*K)
+      ftbls[i] = FlowTable (id=i+1, name=name)
+
+    for h in ftbl.newKeys: # Make categoric flows tables of new flows
+      f = ftbl [h]
+      k = getflowcat (f, cat_method, max_cat=K-1)
+      ftbls [k + offset_new][h] = f # OR SHOULD I USE f.copy()?
+      ftbls [k + offset_any][h] = f
+
+    for h in (ftbl.dirtyKeys - ftbl.newKeys): # Make categoric flows tables of non-new flows
+      f = ftbl [h]
+      k = getflowcat (f, cat_method, max_cat=K-1)
+      ftbls [k + offset_prv][h] = f
+      ftbls [k + offset_any][h] = f
+
+    s = 0
+    for ftbl in ftbls:
+      s += ftbl.size
+    return ftbls
+
+def make_categoric_ftbl_keys (ftbl, K, mode='log2pktcnt'):
+  """
+  Given a ftbl, it returns lists of keys that in categories (classes).
+  Lg2pktCnt: 0, 1, 2, ... (K-1)+
+  State: new, old, any
+  """
+  def mkname (state, lg2pktcnt):
+    if (state == 0):
+      return "new-k"+str(lg2pktcnt)
+    elif (state == 1):
+      return "prv-k"+str(lg2pktcnt)
+    elif (state == 2):
+      return "any-k"+str(lg2pktcnt)
+  
+  _new = 0
+  _prv = 1
+  _any = 2
+
+  keys = {}
+
+  for k in range (K):
+    name = mkname (_new, k)
+    keys [name] = []
+  for k in range (K):
+    name = mkname (_prv, k)
+    keys [name] = []
+  for k in range (K):
+    name = mkname (_any, k)
+    keys [name] = []
+    
+  for h in ftbl.newKeys: # Make categoric list of flows keys of new flows
+    k = getflowcat (ftbl [h], mode, max_cat=K-1)
+    keys [mkname(_new,k)].append (h)
+    keys [mkname(_any,k)].append (h)
+
+  for h in (ftbl.dirtyKeys - ftbl.newKeys): # Make categoric list of flows keys of non-new flows
+    k = getflowcat (ftbl [h], mode, max_cat=K-1)
+    keys [mkname(_prv,k)].append (h)
+    keys [mkname(_any,k)].append (h)
+
+  s = 0
+  for h in keys:
+    s += len (keys[h])
+  print ("make_categoric_ftbl_keys()")
+  print ("TOTAL ENTRIES", s)
+  return keys   
 
 class FlowEntry (AssociativeEntry):
   def __init__ (self, hashCode, p):
@@ -25,11 +121,11 @@ class FlowEntry (AssociativeEntry):
     self.ttl  = p.ttl
     self.len  = p.len
     
-    self.pkt_cnt = 1
-    self.pkt_len = p.len
+    self.pktCnt = 1     # Total packet count
+    self.pktLen = p.len # Total packet length
 
-    self.prv_cnt = 0
-    self.prv_len = 0
+    self.prvCnt = 0     # Total packet count in the previous window
+    self.prvLen = 0     # Total packet length in the previous window
 
     self.req_freq    = None # Request frequency
     self.req_phase_shift = None # Request phase shift
@@ -38,8 +134,8 @@ class FlowEntry (AssociativeEntry):
     self.dirty = False
     self.new   = False
 
-    self.prv_cnt = self.pkt_cnt
-    self.prv_len = self.pkt_len
+    self.prvCnt = self.pktCnt
+    self.prvLen = self.pktLen
     return
 
   def add (self, ts, difCnt, difLen):
@@ -48,8 +144,8 @@ class FlowEntry (AssociativeEntry):
 
     self.ts0  = self.ts
     self.ts   = ts
-    self.pkt_cnt += difCnt
-    self.pkt_len += difLen
+    self.pktCnt += difCnt
+    self.pktLen += difLen
     return
 
   @property
@@ -60,11 +156,13 @@ class FlowEntry (AssociativeEntry):
 
   @property
   def dif_cnt (self):
-    return self.pkt_cnt - self.prv_cnt
+    """ Total packet count in the current window """
+    return self.pktCnt - self.prvCnt
 
   @property
   def dif_len (self):
-    return self.pkt_len - self.prv_len
+    """ Total packet length in the current window """
+    return self.pktLen - self.prvLen
 
   def printInfo (self):
     print ("key:", self.key)
@@ -73,13 +171,73 @@ class FlowEntry (AssociativeEntry):
     print ("is new:", self.new)
     print ("sip dip proto sport dport:",\
       self.sip, self.dip, self.proto, self.sport, self.dport)
-    print ("pkt_cnt pkt_len:", self.pkt_cnt, self.pkt_len)
+    print ("pkt_cnt pkt_len:", self.pktCnt, self.pktLen)
 
 
 class FlowTable (AssociativeTable):
   def __init__ (self, id=0, name=None, entry_max_age=10):
     AssociativeTable.__init__ (self, id, name)
     self.max_age = entry_max_age # entries older than max_age can be removed
+    self.__totalpktCnt = 0
+    self.__totalpktLen = 0
+    self.__dirty_keys = set () # Keys of all dirty entries in the flow table
+    self.__new_keys = set () # Keys of the new entries. This set is a subset of self.__dirty_keys
+    return
+
+  def __populate_keys_sets (self):
+    if (len (self.__new_keys) == 0): # IF new_keys is empty, THEN populate it
+      if (len (self.__dirty_keys) == 0): # IF dirty_keys is empty, THEN populate it too
+        for h, f in self.items ():
+          if f.new == True: # A new entry is also dirty
+            self.__new_keys.add (h)
+            self.__dirty_keys.add (h)
+          elif f.dirty == True:
+            self.__dirty_keys.add (h)
+      else: # IF dirty__keys is NOT empty, THEN populate new_keys based on dirty_keys
+        for h in self.__dirty_keys:
+          if self [h].new == True:
+            self.__new_keys.add (h)
+    return
+
+  @property
+  def dirtyKeys (self):
+    """Keys of dirty entries"""
+    if (len (self.__dirty_keys) == 0):
+      self.__populate_keys_sets ()
+    return self.__dirty_keys
+
+  @property
+  def newKeys (self):
+    """Keys of new entries"""
+    if (len (self.__new_keys) == 0):
+      self.__populate_keys_sets ()
+    return self.__new_keys
+
+  @property
+  def oldKeys (self):
+    """Keys of non-new dirty entries"""
+    return self.dirtyKeys - self.newKeys
+
+  @property
+  def pktCnt (self):
+    return self.__totalpktCnt
+
+  @property
+  def pktLen (self):
+    return self.__totalpktLen
+
+  def clear (self):
+    self.__dirty_keys = set ()
+    self.__new_keys = set ()
+    super().clear ()
+    return
+
+  def set_dirty_keys (self, dkeys):
+    self.__dirty_keys = dkeys
+    return
+
+  def set_new_keys (self, nkeys):
+    self.__new_keys = nkeys
     return
 
   def add_packet (self, p):
@@ -87,8 +245,13 @@ class FlowTable (AssociativeTable):
     h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
     try:
       self.tbl [h].add (p.ts, 1, p.len)
-    except KeyError:
+    except KeyError: # This is a new entry
       self.tbl [h] = FlowEntry(h, p)
+      self.__new_keys.add (h)
+
+    self.__dirty_keys.add (h)
+    self.__totalpktCnt += 1 
+    self.__totalpktLen += p.len
     return h
     
     # if h not in self._tbl:
@@ -102,28 +265,81 @@ class FlowTable (AssociativeTable):
       self.maketbl (t.tbl)
       return
 
-    for h in t.keys():
+    for h, f in t.items():
       try:
-        self.tbl[h].add (t[h].ts, t[h].dif_cnt, t[h].dif_len)
+        self.tbl[h].add (f.ts, f.dif_cnt, f.dif_len)
       except KeyError:
-        self.tbl[h] = t[h].copy()
+        self.tbl[h] = f.copy()
+      if self.tbl[h].new == True: # New entries are also dirty
+        self.__new_keys.add (h)
+        self.__dirty_keys.add (h)
+      elif self.tbl[h].dirty == True:
+        self.__dirty_keys.add (h)
+        
+      self.__totalpktCnt += f.dif_cnt
+      self.__totalpktLen += f.dif_len
     return
 
-    #   if h not in self.keys():
-    #     self[h] = t[h].copy()
-    #   else:
-    #     self[h].add (t[h].ts, t[h].dif_cnt, t[h].dif_len)
-    # return
-  
+  def reset (self):
+    for f in self.tbl.values():
+      f.__totalpktCnt = 0
+      f.__totalpktLen = 0
+    self.__dirty_keys = set ()
+    self.__new_keys = set ()
+    super().reset ()
+    return
+
   def remove_entry (self, h):
     try:
       del self.tbl[h]
+      self.__dirty_keys.discard (h)
+      self.__new_keys.discard (h)
     except KeyError:
-      eprint ("ERR: Could not remove entry %s from the table %s." % (self.name))
+      eprint (f"ERR: Could not remove entry {h} from the table {self.name}.")
       pass
     return
 
-  # def remove_old (self):
+  def clone (self, clone_type=None):
+    """Returns a clone of this table or its subset according to the subset type.
+    Types are the following:
+    None:  current flowtable
+    dirty: flowtable with only dirty flows
+    new:   flowtable with only new flows
+    old:   flowtable with dirty and old flows
+    """
+    if (clone_type == None):
+      ftbl = FlowTable (id=self.id, name=self.name+'-CLONE')
+      for h in self.newKeys:
+        ftbl [h] = self [h]
+      ftbl.set_dirty_keys (self.dirtyKeys) # set of new keys is a subset of dirty keys
+      ftbl.set_new_keys (self.newKeys)
+      
+      
+    elif (clone_type == "new"):
+      ftbl = FlowTable (id=self.id, name=self.name+'-NEW_ENTRIES')
+      for h in self.newKeys:
+        ftbl [h] = self [h]
+      ftbl.set_dirty_keys (self.newKeys) # set of new keys is a subset of dirty keys
+      ftbl.set_new_keys (self.newKeys)
+      
+    elif (clone_type == "dirty"):
+      ftbl = FlowTable (id=self.id, name=self.name+'-DIRTY_ENTRIES')
+      for h in self.dirtyKeys:
+        ftbl [h] = self [h]
+      ftbl.set_dirty_keys (self.dirtyKeys) 
+      ftbl.set_new_keys (self.newKeys)
+      
+    else:
+      eprint ("ERR: Wrong clone_type:", clone_type)
+      raise Exception
+
+    return ftbl
+
+  def entropy (self):
+    return
+
+
+  # def remove_prv (self):
   #   """Removes old entries"""
   #   for h in self.tbl:
   #     if (self.tbl[h].age > self.max_age ):

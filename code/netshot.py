@@ -7,10 +7,13 @@ import sys
 import matplotlib.pyplot as plt
 import dpkt
 import pickle # for srialization
-from utilities import eprint
+
 from structures import FTDObj
 from flowTable import FlowTable
 from pcapstream import pickle_write
+from utilities import eprint
+from utilities import COLOR_CODE as C
+
 sys.path.append(".")
 
 # import locals
@@ -56,10 +59,11 @@ class NetShot:
             times.append (float (sd.time))
 
             # Create dumper object for each switch
-            fd = pickle_write (os.path.splitext (f)[0]+'.ftd', outdir=nsdir)
+            # fd = pickle_write (os.path.splitext (f)[0]+'.ftd', outdir=nsdir)
+            filename = nsdir+'/'+os.path.splitext (f)[0]+'.ftd'
+            fd = pickle_write (filename, mode='w+b')
             self.netshots [f] = fd
             print ("")
-
         # readjust time of all switches to the earliest one
         basetime = int (min (times)/timewin)*timewin
         print ("Base Time:", basetime)
@@ -70,14 +74,15 @@ class NetShot:
         it = 0
         alldone = False
         while (not alldone):
+            print (C.YLW+'Time: {:.2f} to {:.2f}\033[m'.format ( it*self.timewin, (it+1)*self.timewin))
+            it += 1
+            
             # Clear all flow tables before proceeding. This is because we need to boot
             # the processing speed, and also we only need to store flow table content
             # in each window
             for d in self.switches:
                 self.switches [d].switch.flow_table.clear ()
             
-            print ('Time: {:.2f} to {:.2f}'.format ( it*self.timewin, (it+1)*self.timewin))
-            it += 1
             # all switches run
             for d in self.switches:
                 sd = self.switches [d]
@@ -86,7 +91,7 @@ class NetShot:
                 ftbl = sd.switch.flow_table
                 if (ftbl.size != 0):
                     dumptype = FTDObj.DumpType.NEW_FLOWTABLE
-                    print ("New Flow table %s. Store %d entries."%(sd.switch.name, ftbl.size()))
+                    print ("New Flow table %s. Store %d entries."%(sd.switch.name, ftbl.size))
                 else:
                     dumptype = FTDObj.DumpType.NO_FLOWTABLE_CHANGE
                 # for k in ftbl.keys():

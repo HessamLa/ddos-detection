@@ -6,6 +6,7 @@ from utilities import eprint
 import numpy as np
 
 import time
+from entropyfunction import entropy
 
 
 class EntropyEntry (AssociativeEntry):
@@ -45,7 +46,7 @@ class EntropyTable (AssociativeTable):
     def __init__ (self, id=0, name=None, entry_min_time=10):
         AssociativeTable.__init__ (self, id, name)
         self.min_time = entry_min_time # entries older than min_time can be removed
-        self._entropy = []
+        self.__entropy = []
         self.new_cnt = 0
         self.oldent_cnt = 0
         return
@@ -70,7 +71,7 @@ class EntropyTable (AssociativeTable):
         # return
 
     def reset (self):
-        self._entropy = []
+        self.__entropy = []
         self.new_cnt = 0
         for ent in self:
             ent.reset ()
@@ -78,38 +79,29 @@ class EntropyTable (AssociativeTable):
 
     def remove_old (self):
         """Removes old entries"""
-        for h in self.tbl:
-            if (self.tbl[h].age > self.min_time ):
+        for h, f in self.tbl.items ():
+            if (f.age > self.min_time ):
                 self.tbl.pop (h)
         return
 
     @property
     def entropy (self):
-        '''calculate entropy of each column in the table, array of entropies
+        '''Calculates entropy of each column in the table
+        Returns list-array of entropies
         '''
-        if (len (self._entropy) != 0):
-            return self._entropy
+        if (len (self.__entropy) != 0):
+            retval = self.__entropy
 
         # convert dictionary to numpy array
-        if ( self.size == 0 ):
-            return np.array ([0,0])
+        elif ( self.size == 0 ):
+            retval = np.array ([0,0])
         
         # t1 = time.time()
-        array = np.array ([[ent.dif_cnt, ent.dif_len] for ent in self if ent.dirty==True], dtype='f')
-        # t2 = time.time()
-        p = array/array.sum (axis=0) # divide each cell by sum of its column
-        if (len (p[p==0])>0):
-            print ("ERROR WITH entropy()")
-        p[p==0] = 1
-        # logp = np.where(p>0, np.log(p), 0) # consider 0 for entries of p that are not positive
-        # t3 = time.time()
-        logp = np.log(p)
-        # t4 = time.time()
-        plogp = -np.multiply (p, logp)
-        # t5 = time.time()
-        # print ('%.2f %.2f %.2f %.2f '%(t2-t1, t3-t2, t4-t3, t5-t4))
-        self._entropy = plogp.sum (axis=0) # sum over columns, and return a list of entries
-        return self._entropy
+        else:
+            array = np.array ([[ent.dif_cnt, ent.dif_len] for ent in self if ent.dirty==True], dtype='f')
+            self.__entropy = entropy (array)
+            retval = self.__entropy
+        return retval.tolist()
 
     def printInfo (self):
         [ent_pcnt, ent_plen] = self.entropy
@@ -118,5 +110,5 @@ class EntropyTable (AssociativeTable):
         #     print (t)
 
     def printEntries (self):
-        for h in self.keys():
-            print ("{:10}".format(str(h)), self[h].pkt_cnt, self[h].dif_cnt, self[h].pkt_len, self[h].dif_len)
+        for h, f in self.items():
+            print ("{:10}".format(str(h)), f.pkt_cnt, f.dif_cnt, f.pkt_len, f.dif_len)

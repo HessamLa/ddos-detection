@@ -64,10 +64,10 @@ class Switch_Class:
     self.time = None
     self.next_pkt_id = 0 # ID of the next immediate packet not processed so far. Note the first row of packets is for columns labels
 
-    self._ftbl = FlowTable (id=self.id, name=self.name)
-    self._newftbl = None # New entries; This is a temporary flow table that needs to be reset at the start of each window
-    self._drtftbl = None # Dirty entries; This is a temporary flow table that needs to be reset at the start of each window
-    self._drtindx = set() # Set of indices of the dirty flow table entries; It must be reset at the start of each window
+    self.__ftbl = FlowTable (id=self.id, name=self.name)
+    self.__newftbl = None # New entries; This is a temporary flow table that needs to be reset at the start of each window
+    self.__drtftbl = None # Dirty entries; This is a temporary flow table that needs to be reset at the start of each window
+    self.__drtindx = set() # Set of indices of the dirty flow table entries; It must be reset at the start of each window
     return
 
   def update_properties (self, timewin=None, time=None):
@@ -77,84 +77,89 @@ class Switch_Class:
 
   def send_packets (self, packets): # this method sends packets to the controller
     self.packets = packets
-    self._process (packets)
+    self.__process (packets)
     return
 
   @property
   def flow_table (self, dirty=False, new=False, pktCnt=None, lg2pktCnt=None):
     # return self.__flows
     if (dirty == False and new == False):
-      return self._ftbl
+      return self.__ftbl
     
     if (dirty == True):
       ftbl = FlowTable (name=self.name+'-DIRTY')
-      for k in self._ftbl.keys():
-        if self._ftbl[k].dirty == True:
-          ftbl[k] = self._ftbl[k]
+      for k in self.__ftbl.keys():
+        if self.__ftbl[k].dirty == True:
+          ftbl[k] = self.__ftbl[k]
 
     elif (new == True):
       ftbl = FlowTable (name=self.name+'-NEW')
-      for k in self._ftbl.keys():
-        if self._ftbl[k].new == True:
-          ftbl[k] = self._ftbl[k]
+      for k in self.__ftbl.keys():
+        if self.__ftbl[k].new == True:
+          ftbl[k] = self.__ftbl[k]
 
     elif (pktCnt != None):
       ftbl = FlowTable (name=self.name+'-'+str(pktCnt)+'FLOWS')
-      for k in self._ftbl.keys():
-        if self._ftbl[k].dif_cnt == pktCnt:
-          ftbl[k] = self._ftbl[k]
+      for k in self.__ftbl.keys():
+        if self.__ftbl[k].dif_cnt == pktCnt:
+          ftbl[k] = self.__ftbl[k]
 
     elif (lg2pktCnt > 0):
       if (lg2pktCnt >= 9): name=self.name+'-'+str(pktCnt)+'+Lg2FLOWS'
       else:                name=self.name+'-'+str(pktCnt)+'Lg2FLOWS'
       ftbl = FlowTable (name=name)
-      for k in self._ftbl.keys():
-        cnt = self._ftbl[k].dif_cnt
+      for k in self.__ftbl.keys():
+        cnt = self.__ftbl[k].dif_cnt
         if (cnt == 0): continue
         i = int (math.log2(cnt)) + 1
         if (i == lg2pktCnt or (lg2pktCnt >= 9 and i >= 9)):
-          ftbl[k] = self._ftbl[k]
+          ftbl[k] = self.__ftbl[k]
     return ftbl
 
-  @property
-  def flow_table_new (self):
-    if (self._newftbl != None):
-      return self._newftbl
-    self._newftbl = FlowTable (id=self.id, name=self.name+'_NEW_ENTRIES')
-    for h in self._ftbl.keys ():
-      f = self._ftbl [h]
-      if (f.new == True):
-        self._newftbl [h] = f
-    return self._newftbl
+  # @property
+  # def flow_table_new (self):
+  #   if (self.__newftbl != None):
+  #     return self.__newftbl
+  #   self.__newftbl = FlowTable (id=self.id, name=self.name+'_NEW_ENTRIES')
+  #   # for h in self.__ftbl.keys ():
+  #   #   f = self.__ftbl [h]
+  #   #   if (f.new == True):
+  #   #     self.__newftbl [h] = f
+  #   for h in self.__ftbl.newKeys:
+  #     self.__newftbl [h] = self.__ftbl [h]
+  #   return self.__newftbl
 
-  @property
-  def flow_table_dirty (self):
-    t1 = time.time()
-    if (self._drtftbl != None):
-      return self._drtftbl
-    self._drtftbl = FlowTable (id=self.id, name=self.name+'DIRTY_ENTRIES')
-    for h in self._ftbl.keys ():
-      f = self._ftbl [h]
-      if (f.dirty == True):
-        self._drtftbl [h] = f
-    print ('switch.flow_table_dirty prep time {}{:.2f}{}'.format (C.RED, time.time() - t1, C.NC))
-    return self._drtftbl
+  # @property
+  # def flow_table_dirty (self):
+  #   t1 = time.time()
+  #   if (self.__drtftbl != None):
+  #     return self.__drtftbl
+  #   self.__drtftbl = FlowTable (id=self.id, name=self.name+'DIRTY_ENTRIES')
+  #   # for h in self.__ftbl.keys ():
+  #   #   f = self.__ftbl [h]
+  #   #   if (f.dirty == True):
+  #   #     self.__drtftbl [h] = f
+  #   for h in self.__ftbl.dirtyKeys:
+  #     self.__drtftbl [h] = self.__ftbl [h]    
+  #   print ('switch.flow_table_dirty prep time {}{:.2f}{}'.format (C.RED, time.time() - t1, C.NC))
+  #   return self.__drtftbl
 
   @flow_table.setter
   def flow_table (self, ftbl):
     # self.__flows = ftbl
-    self._ftbl = ftbl
+    self.__ftbl = ftbl
     return
 
   def reinit (self):
     """Reset flags of all current entries
     """
-    for flow in self._ftbl:
+    for flow in self.__ftbl:
       flow.reset ()
-    self._newftbl = None
-    self._drtftbl = None
-    self._drtindx = set()
+    self.__newftbl = None
+    self.__drtftbl = None
+    self.__drtindx = set()
 
+  # NEEDS OPTIMIZATION
   def maintain_flowtable (self, timelim=None, idle_timeout=None,\
     sip=None, dip=None, sport=None, dport=None, proto=None):
     """Remove entries from the table according to these criteria."""
@@ -171,7 +176,7 @@ class Switch_Class:
         self.flow_table.remove_entry (k)
     print (C.RED, self.name, "Table maintenance time", time.time() - t1, C.NC)
     
-  def _process (self, packets=None):
+  def __process (self, packets=None):
     # # All previous stats must be marked as old
     # for h in self.stats:
     #   self.stats [h].reinit_window()
@@ -184,12 +189,12 @@ class Switch_Class:
       # # print (p)
       # h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
 
-      # if h not in self._ftbl.keys():
-      #   self._ftbl [h] = FlowEntry(h, p)
+      # if h not in self.__ftbl.keys():
+      #   self.__ftbl [h] = FlowEntry(h, p)
       # else:
-      #   self._ftbl [h].add (ts=p.ts, difCnt=1, difLen=p.len)
+      #   self.__ftbl [h].add (ts=p.ts, difCnt=1, difLen=p.len)
       # OR WE COULD IMPLEMENT THIS:
-      self._ftbl.add_packet (p)
+      self.__ftbl.add_packet (p)
 
 
 class Switch_Driver:
@@ -236,6 +241,7 @@ class Switch_Driver:
   def is_done (self):
     return self._done
 
+  # NEEDS OPTIMIZATION
   def progress (self, timelim=None, timewin=None):
     """Progress state of the switch by reading packets from pcap source which have timestamp
     before time 'timelim' (time limit). If timelim is not given, then it is calculated by current time
@@ -258,7 +264,7 @@ class Switch_Driver:
     st = 0
     self.switch.reinit()
     if (self.filetype == 'pcap'):
-      for packets in self._read_pcaps(self.time + self.timewin):
+      for packets in self.__read_pcaps(self.time + self.timewin):
         t2 = time.time()
         self.switch.send_packets (packets=packets)
         t3 = time.time()
@@ -268,11 +274,12 @@ class Switch_Driver:
       self.time += self.timewin
       print ('switch.progress(): switch.send_packets() time={}{:.2f}{}, total time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1, C.NC))
     elif (self.filetype == 'ftd'):
-      t1=time.time()
-
-      t2=time.time()
       for ftbl in self._read_ftable (self.time + self.timewin):
-          self.switch.flow_table.add_table (ftbl)
+        t2 = time.time()
+        self.switch.flow_table.add_table (ftbl)
+        st += time.time()-t2
+      t3 = time.time()
+      print ('switch.progress(): switch.flow_table.add_table() time={}{:.2f}{}, ReadFtbl time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1-st, C.NC))
 
     #   if (not hasattr(self, 'nshot')):
     #     self.nshot = self._read_ftable (self.time + self.timewin)
@@ -292,9 +299,6 @@ class Switch_Driver:
 
       self.time += self.timewin
       
-      t3=time.time()
-      if (t3-t1 > 1):
-        print ('switch.progress: tReadFTD=%.2f tAddTbl=%.2f'%(t2-t1, t3-t2))
     self.switch.update_properties (time = self.time)
 
     s1 = self.switch.flow_table.size
@@ -303,8 +307,8 @@ class Switch_Driver:
     print (">>>switch.progress(): "+str(s1)+" - "+str(s2)+" = \033[0;31m"+str(s1-s2)+"\033[0m<<<<<")
     return
 
-  def _read_pcaps (self, timelim):
-    # print (">>>>> switch._read_pcaps()", self.filename, 'continuing from time', self.time)
+  def __read_pcaps (self, timelim):
+    # print (">>>>> switch.__read_pcaps()", self.filename, 'continuing from time', self.time)
     packets=[]
     totalcnt = 0
     
@@ -328,7 +332,7 @@ class Switch_Driver:
           yield packets
           packets = []
     except:
-      print ("switch._read_pcaps(): packet type is", type(self.p))
+      print ("switch.__read_pcaps(): packet type is", type(self.p))
       exit()
 
     if (self.p==None): self._done = True

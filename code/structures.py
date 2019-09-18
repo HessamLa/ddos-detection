@@ -43,16 +43,19 @@ class AssociativeTable:
     def __getitem__ (self, key):
         return self._tbl [key]
 
-    def __setitem__ (self, key, entry):
-        self._tbl [key] = entry
+    def __setitem__ (self, key, value):
+        self._tbl [key] = value
         return
 
     def __iter__ (self):
-        for h in self._tbl:
-            yield self._tbl[h]
+        for f in self._tbl.values():
+            yield f
 
     def items (self):
         return self._tbl.items ()
+
+    def values (self):
+        return self._tbl.values ()
     
     def keys (self):
         """Returns keys for all entries"""
@@ -73,6 +76,10 @@ class AssociativeTable:
         """Returns number of elements in this table"""
         return len (self._tbl)
 
+    def copy (self):
+        
+        return 
+
     def clear (self):
         self._tbl.clear ()
         return
@@ -91,16 +98,16 @@ class FTDObj: # Flow Table Dump Obj
         NO_FLOWTABLE_CHANGE=2
         NONE=3
 
-    @classmethod
-    def pack_obj (cls, dumptype, protocols, timewin, time, flow_table):
+    @staticmethod
+    def pack_obj (dumptype, protocols, timewin, time, flow_table):
         """ The input are dumptype, protocols, timewin, time, flow_table
         which pertain to a switch-driver
         returns obj = [dumptype, protocols, timewin, time, flow_table]
         """
         obj = [dumptype, protocols, timewin, time, flow_table]
         return obj
-    @classmethod
-    def unpack_obj (cls, obj):
+    @staticmethod
+    def unpack_obj (obj):
         """ The input is an obj which pertain to a switch-driver state
         [protocols, timewin, time, flow_table] = obj
         return dumptype, protocols, timewin, time, flow_table

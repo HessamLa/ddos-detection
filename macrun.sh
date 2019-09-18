@@ -1,13 +1,19 @@
 #!/bin/bash
 
+#!/bin/bash
 
 DDOS_DIR=~/ddos-detection
 CODE_DIR=${DDOS_DIR}/code
-DMPS_DIR=${DDOS_DIR}/dmps
 
 DS_DIR=$DDOS_DIR/datasets
-NSHOT_DIR=${DS_DIR}/maccdc2012
-PCAP_DIR=${DS_DIR}/maccdc2012
+DS_NAME=maccdc2012
+# DS_NAME=caida
+
+NSHOT_DIR=${DS_DIR}/${DS_NAME}
+PCAP_DIR=${DS_DIR}/${DS_NAME}
+
+OUT_DIR=${DDOS_DIR}/out-${DS_NAME}
+mkdir $OUT_DIR
 
 # echo "****************************************"
 # echo "* Making NetShots **********************"
@@ -48,9 +54,9 @@ for T in "${times[@]}"
 do
     echo "****************************************"
     echo "* Making Entropies and Statistics ******"
-    STATDST="${DMPS_DIR}/stat_log2_maccdcall_t${T}.txt"
-    ENTDST="${DMPS_DIR}/ent_maccdcall_t${T}.dmp"
-    c="${CODE_DIR}/psim.py -f $NSHOT_DIR -t $T -e $ENTDST > $STATDST"
+    STATDST="${OUT_DIR}/maccdcall_t${T}.stt"
+    ENTDST="${OUT_DIR}/maccdcall_t${T}.ent"
+    c="${CODE_DIR}/psim.py -f $NSHOT_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST > log.tmp"
     # c="${CODE_DIR}/psim.py -f $NSHOT_DIR -t $T -e $ENTDST"
     echo "* |Time Window             ${T}s"
     echo "* |NShot Source Dir        $NSHOT_DIR"

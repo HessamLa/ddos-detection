@@ -27,9 +27,33 @@ def f(args):
     process_info ('function f')
     print ('hello', name, ID, '.')
 
+
 class dictest():
-    def __init__ (self):
+    def __init__ (self, N):
+        self.N = N
+        self.__tbls = [BaseTable() for i in range (self.N)]
+
+        import concurrent.futures
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=N)
         return
+
+    def setitem (self, key, value):
+        tblid=key & (self.N-1)
+        # self.__tbl [key] = value
+        self.executor.submit (self.__tbls[tblid].setitem, key, value)
+        return
+
+    def getitem (self, key):
+        tblid=key & (self.N-1)
+        try:
+            value = self.executor.submit (self.__tbls[tblid].getitem, key).result()
+        except:
+            return None
+        return value
+
+
+
+
 
 class base1:
     def __init__ (self, n):
@@ -50,77 +74,154 @@ class ctest (base1):
     def printn (self):
         print (self.n)
 
+def test(*a, **b):
+    for v in a:
+        print (v)
+
+    for k,v in b.items():
+        print (k, v)
+
+
+class Obj ():
+    def __init__ (self, a, b, c, *args):
+        self.a = a
+        self.b = b
+        self.c = c
+        self.lst = []
+        for a in args:
+            self.lst.append (a)
+
+    def __repr__ (self):
+
+        # print ("a, b, c:", self.a, self.b, self.c)
+        s="a, b, c: "+str(self.a) +' '+ str(self.b) +' ' + str (self.c)
+        s += '\n'
+        for a in self.lst:
+            s+= str(a)+'-'
+        return s
+
 if __name__ == "__main__":
-    c1  = ctest()
-    c2 = ctest()
-    c3 = c2.copy ()
-    c2.iobj = "OOO"
-    print (c1.count, c1.value, c1.iobj)
-    print (c2.count, c2.value, c2.iobj)
-    print (c3.count, c3.value, c3.iobj)
-
-    c4  = ctest(n=6)
-    # print (c4.n)
-    c4.printn ()
-
-    MAX = 10000
-    a = [random.random() for i in range (MAX)]
-    loga = np.log(a)
-    print (loga)
-
-    p = Pool(2)
-    p.map(f, [('bob', 5),('jack',111)])
-    # p = Process(target=f, args=('bob', 5,))
-    # p.start()
-    # p.join()
+    test (1,'hg', a=1, jam=8.2)
 
     import numpy as np
-    import matplotlib.pyplot as plt
-    from matplotlib.widgets import Slider, Button, RadioButtons
+    from math import ceil
+    import random
+    import time
+    
+    
+    def do_obj (obj):
+        obj.x = obj.a+obj.b
 
-    fig, ax = plt.subplots()
-    plt.subplots_adjust(left=0.25, bottom=0.25)
-    t = np.arange(0.0, 1.0, 0.001)
-    a0 = 5
-    f0 = 3
-    s = a0*np.sin(2*np.pi*f0*t)
-    l, = plt.plot(t, s, lw=2, color='red')
-    plt.axis([0, 1, -10, 10])
+    obj =[]
+    w = 1000000
+    for i in range (w):
+        obj.append (Obj (i,i*10,i*100+10, i,i,i))
+    print (obj[11])
+    for o in obj:
+        do_obj (o)
+    
+    exit ()
 
-    axcolor = 'lightgoldenrodyellow'
-    axfreq = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
-    axamp = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
+    
+    w = 1000
+    bins = [i*w for i in range (ceil (65535/w)+1)]
+    print (bins)
 
-    sfreq = Slider(axfreq, 'Freq', 0.1, 30.0, valinit=f0)
-    samp = Slider(axamp, 'Amp', 0.1, 10.0, valinit=a0)
+    def do_log2 (arr):
+        t0 = time.time()
+        for i in range (len (arr)):
+            try:
+                a = np.log2 (arr[i])
+            except:
+                print (arr[i])
+                
+        print ("time log2:", time.time() - t0)
+
+    def do_log10 (arr):
+        t0 = time.time()
+        for i in range (len (arr)):
+            try:
+                a = np.log10 (arr[i])
+            except:
+                print (arr[i])
+                
+        print ("time log10:", time.time() - t0)
+
+    def do_log (arr):
+        t0 = time.time()
+        for i in range (len (arr)):
+            try:
+                a = np.log (arr[i])
+            except:
+                print (arr[i])
+                
+        print ("time log_e:", time.time() - t0)
+
+    maxx = 100000
+    arr = np.arange(1, 1001, 100/maxx)
+    random.shuffle (arr)
+    print ("made the thing")
 
 
-    def update(val):
-        amp = samp.val
-        freq = sfreq.val
-        l.set_ydata(amp*np.sin(2*np.pi*freq*t))
-        fig.canvas.draw_idle()
-    sfreq.on_changed(update)
-    samp.on_changed(update)
+    do_log (arr)
+    do_log2 (arr)
+    do_log10 (arr)
+    do_log (arr)
+    do_log2 (arr)
+    do_log10 (arr)
+    do_log (arr)
+    do_log2 (arr)
+    do_log10 (arr)
+    exit ()
+    
+    maxx = 10000000
+    d = dict()
+    print ("filling up the table")
+    for i in range (maxx):
+        if (i%100000==0):
+            print (i)
+        r = random.random ()
+        # index = int (maxx*r)
+        index = hash (r)
+        d [index] = r
 
-    resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
-    button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
+    max_iter = 10
+    
+    t_total = 0
+    for i in range (max_iter):
+        t0 = time.time ()
+        a=0
+        for v in d.values():
+            if (v < 0.001):
+                a+=1
+        t1 = time.time ()
+        t_total += t1-t0
+    print ("Third experiment 'for v in d.values():'\n time avg:", t_total/max_iter, "a=", a)
+
+    t_total = 0
+    for i in range (max_iter):
+        t0 = time.time ()
+        a=0
+        for index in d:
+            if (d[index] < 0.001):
+                a+=1
+        t1 = time.time ()
+        t_total += t1-t0
+    print ("First experiment 'for index in d:'\n time avg:", t_total/max_iter, "a=", a)
+    
+    t_total = 0
+    for i in range (max_iter):
+        t0 = time.time ()
+        a=0
+        for index, v in d.items():
+            if (v < 0.001):
+                a+=1
+        t1 = time.time ()
+        t_total += t1-t0
+    print ("Second experiment 'for index, v in d.items():'\n time avg:", t_total/max_iter, "a=", a)
 
 
-    def reset(event):
-        sfreq.reset()
-        samp.reset()
-    button.on_clicked(reset)
-
-    rax = plt.axes([0.025, 0.5, 0.15, 0.15], facecolor=axcolor)
-    radio = RadioButtons(rax, ('red', 'blue', 'green'), active=0)
 
 
-    def colorfunc(label):
-        l.set_color(label)
-        fig.canvas.draw_idle()
-    radio.on_clicked(colorfunc)
-
-    plt.show()
-
-
+    
+    # print (bins)

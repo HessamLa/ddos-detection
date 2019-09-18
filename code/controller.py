@@ -1,5 +1,8 @@
 from flowTable import FlowTable
+import math
+from utilities import eprint
 #from switch import *
+
 
 class Controller:
     def __init__ (self):
@@ -24,11 +27,11 @@ class Controller:
 
     def add_ftable (self, ftbl):
         """Adds the passed flow table 'ftbl' to the aggregated flow table 'ftbl_all'"""
-        for h in ftbl.keys():                       # FOREACH flow entry
-                if h not in self.ftbl_all.keys():      # IF the flow is dirty
-                    self.ftbl_all[h] = ftbl[h].copy()
-                else:
-                    self.ftbl_all[h].add (ts=ftbl[h].ts, difCnt=ftbl[h].dif_cnt, difLen=ftbl[h].dif_len)
+        for h, f in ftbl.items():                       # FOREACH flow entry
+            if h not in self.ftbl_all.keys():      # IF the flow is dirty
+                self.ftbl_all[h] = f.copy()
+            else:
+                self.ftbl_all[h].add (ts=f.ts, difCnt=f.dif_cnt, difLen=f.dif_len)
         return
 
     def aggregate_ftables (self):
