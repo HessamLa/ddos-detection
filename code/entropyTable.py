@@ -70,19 +70,19 @@ class EntropyTable (AssociativeTable):
         #     self.tbl [i].add (time, pkt_cnt, pkt_len)
         # return
 
-    def reset (self):
-        self.__entropy = []
-        self.new_cnt = 0
-        for ent in self:
-            ent.reset ()
-        return
+    # def reset (self):
+    #     self.__entropy = []
+    #     self.new_cnt = 0
+    #     for ent in self:
+    #         ent.reset ()
+    #     return
 
-    def remove_old (self):
-        """Removes old entries"""
-        for h, f in self.tbl.items ():
-            if (f.age > self.min_time ):
-                self.tbl.pop (h)
-        return
+    # def remove_old (self):
+    #     """Removes old entries"""
+    #     for h, f in self.tbl.items ():
+    #         if (f.age > self.min_time ):
+    #             self.tbl.pop (h)
+    #     return
 
     @property
     def entropy (self):

@@ -125,27 +125,69 @@ if __name__ == "__main__":
     w = 1000000
     t0 = time.time()
 
-    sips = [random.randint (1, 2000) for i in range (w)]
+    sips = [random.randint (1, 7) for i in range (w)]
     dips = [random.randint (1, 2000) for i in range (w)]
     sps  = [random.randint (1, 2000) for i in range (w)]
     dps  = [random.randint (1, 2000) for i in range (w)]
     proto= [random.randint (1, 7) for i in range (w)]
-    pcnt = list(10*np.random.exponential (0.2, w).astype(int))
-    plen = list(10*np.random.exponential (0.2, w).astype(int))
+    pcnt = list(10*np.random.exponential (0.3, w).astype(int)+1)
+    plen = list(10*np.random.exponential (0.2, w).astype(int)+1)
     print ("Time elapsed {:.3f}".format (time.time()-t0))
     
     print ("\nMake an ndarray")
     t0 = time.time()
+    # ftbl = [[sips[i], dips[i], sps[i], dps[i], proto[i], pcnt[i], plen[i]] for i in range (w)]
     ftbl = list (zip (sips, dips, sps, dps, proto, pcnt, plen))
     tbl = np.array (ftbl, 
         dtype=[('SIP','i'),('DIP','i'),('SP', 'i'),('DP','i'),('PROTO', 'i'),('PCNT','i'),('PLEN','i')])
-    print ("Time elapsed {:.3f}".format (time.time()-t0))
+    print ("Time elapsed {:.3f}\n".format (time.time()-t0))
 
     print (tbl.shape)
 
 
 
     print ("Do entropies")
+    total_pcnt = np.sum (tbl['PCNT'])
+
+    print ("Total packet count", total_pcnt)
+    print ("Totla entries", len (tbl))
+
+    pcnt = tbl['PCNT']
+    n = pcnt
+    t0 = time.time()
+    nlogn = np.multiply (n, np.log(n))
+    print ("nLogn time {:.3f}\n".format (time.time()-t0))
+
+    # t0 = time.time()
+    # from numpy.lib.recfunctions import append_fields
+    # z = append_fields(tbl, 'nlogn', nlogn)
+    # tbl = z
+    # print ("add field time {:.3f}\n".format (time.time()-t0))
+    # print (tbl.dtype)
+    
+    from entropyfunction import entropy
+    def do_entropy (tbl, field, N):
+        s = set (tbl[field])
+        n = []
+        for j in s:
+            indices = tbl[field]==j
+            n.append ([tbl['PCNT'][indices].sum(), tbl['PLEN'][indices].sum()])
+
+        e = entropy (np.array (n), N)
+        print ("SIP", e)
+        
+    N = total_pcnt
+    field='SIP'
+    do_entropy (tbl, field, N)
+
+    field='DIP'
+    do_entropy (tbl, field, N)
+    do_entropy (tbl, 'SP', N)
+    do_entropy (tbl, 'DP', N)
+    do_entropy (tbl, 'PROTO', N)
+
+    # print (n)
+    # print (s)
     
     print ("done")
     exit()

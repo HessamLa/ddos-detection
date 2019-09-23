@@ -6,8 +6,8 @@ def entropy_old (tbl):
     The tbl is a nxm numpy object.
     The function returns a m elements numpy array
     """
-    if ((tbl < 0).any()):
-        print ("ERR: The tbl has some negative entries. All entries must be positive.")
+    if ((tbl <= 0).any()):
+        print ("ERR: The tbl has some Negative (-) or ZERO (0) entries. All entries must be positive (+).")
         return None
 
     # Each column must have at least one non-zero element.
@@ -35,13 +35,13 @@ def entropy_old (tbl):
     # print ('%.2f %.2f %.2f %.2f '%(t2-t1, t3-t2, t4-t3, t5-t4))
     return plogp.sum (axis=0) # sum over columns, and return a list of entries
 
-def entropy (tbl):
+def entropy (tbl, N=None):
     """ Calculate entropy of each column of the given tbl.
     The tbl is a nxm numpy object.
     The function returns a m elements numpy array
     """
-    if ((tbl < 0).any()):
-        print ("ERR: The tbl has some negative entries. All entries must be positive.")
+    if ((tbl <= 0).any()):
+        print ("ERR: The tbl has some Negative (-) or ZERO (0) entries. All entries must be positive (+).")
         return None
 
     # Each column must have at least one non-zero element.
@@ -52,7 +52,9 @@ def entropy (tbl):
         if sums[i]==0:
             tbl [:, i] = 1
 
-    N = tbl.sum (axis=0)
+    if (N==None):
+        N = tbl.sum (axis=0)
+        
     n = tbl # Get probability of each cell
     if (len (n[n==0])>0): # NOT SURE IF THIS IS NECESSARY
         print ("ERROR WITH entropy()")
@@ -65,8 +67,8 @@ def entropy (tbl):
     # t3 = time.time()
     logn = np.log(n)
     # t4 = time.time()
-    nlogn = -np.multiply (n, logn)
+    nlogn = np.multiply (n, logn)
     # t5 = time.time()
     # print ('%.2f %.2f %.2f %.2f '%(t2-t1, t3-t2, t4-t3, t5-t4))
     
-    return nlogn.sum (axis=0)/N + np.log(N) # sum over columns, and return a list of entries
+    return -nlogn.sum (axis=0)/N + np.log(N) # sum over columns, and return a list of entries
