@@ -107,19 +107,71 @@ if __name__ == "__main__":
     from math import ceil
     import random
     import time
-    
-    
+        
     def do_obj (obj):
         obj.x = obj.a+obj.b
 
     obj =[]
-    w = 1000000
+    w = 100
     for i in range (w):
         obj.append (Obj (i,i*10,i*100+10, i,i,i))
-    print (obj[11])
+    # print (obj[11])
+    
     for o in obj:
         do_obj (o)
     
+    w = 1000000
+    print ("\nMake one million entries")
+    w = 1000000
+    t0 = time.time()
+
+    sips = [random.randint (1, 2000) for i in range (w)]
+    dips = [random.randint (1, 2000) for i in range (w)]
+    sps  = [random.randint (1, 2000) for i in range (w)]
+    dps  = [random.randint (1, 2000) for i in range (w)]
+    proto= [random.randint (1, 7) for i in range (w)]
+    pcnt = list(10*np.random.exponential (0.2, w).astype(int))
+    plen = list(10*np.random.exponential (0.2, w).astype(int))
+    print ("Time elapsed {:.3f}".format (time.time()-t0))
+    
+    print ("\nMake an ndarray")
+    t0 = time.time()
+    ftbl = list (zip (sips, dips, sps, dps, proto, pcnt, plen))
+    tbl = np.array (ftbl, 
+        dtype=[('SIP','i'),('DIP','i'),('SP', 'i'),('DP','i'),('PROTO', 'i'),('PCNT','i'),('PLEN','i')])
+    print ("Time elapsed {:.3f}".format (time.time()-t0))
+
+    print (tbl.shape)
+
+
+
+    print ("Do entropies")
+    
+    print ("done")
+    exit()
+    a = np.array (
+        [
+        (10, 'samo', 26.5),
+        (10, 'jack', 28.5),
+        (20, 'jack', 18.5),
+        (30, 'jack',  9.5),
+        (10, 'samo', 45.5)
+        ],
+        dtype=[('gid', 'i'),('name', str),('yield', 'f')])
+    print (type(a))
+    j=0
+    i = (a['name']=='jack')
+    j = (a['gid']==10)
+    print (i)
+    print (j)
+    print (i&j)
+    
+    a = np.array(['a', 'b', 'c', 'd', 'e'])
+    b = np.arange(5)
+    records = np.rec.fromarrays((a, b), names=('keys', 'data'))
+    print (records)
+    print (records['keys'][2])
+
     exit ()
 
     
