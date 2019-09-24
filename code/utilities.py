@@ -153,3 +153,23 @@ class HashCollection:
     dp  = dict()  # destination port
 
 
+import time
+class tlog():
+  tstart=0
+  tend=0
+  def __init__(self):
+    return
+  @classmethod
+  def start(cls):
+    cls.tstart = time.time()
+    return cls.tstart
+  @classmethod
+  def diff(cls):
+    return time.time()-cls.tstart
+  @classmethod
+  def end(cls):
+    cls.tend = time.time()
+    return cls.tend
+
+
+
