@@ -25,8 +25,11 @@ from flowTable import make_categoric_ftbl_keys
 
 from utilities import eprint
 from utilities import COLOR_CODE as C
+from utilities import tlog
 
 import multiprocessing as mp
+
+
 
 class Simulator:
   def __init__ (self, idir='.', timewin=5.0, filterstr='', filetype='pcap', protocol='',\
@@ -95,7 +98,7 @@ class Simulator:
 
       t2 = time.time()
       # controller runs and collects stats from switches
-      
+      tlog.start()
       # get controller data and pass it to EntropySet
       # For the sake of speed, if there is only one switch, then copy it into the controller ftbl
       if (len (self.switches) == 1):
@@ -105,7 +108,10 @@ class Simulator:
           self.controller.add_ftable (self.switches[d].switch.flow_table.clone ("dirty"))
       ftbl_all = self.controller.ftbl_all
       # ftbl_all = self.controller.get_ftbl_all ()
-      t3 = time.time()
+      t_ftbl_all = tlog.diff()
+
+      from entropizer import entropize
+      entropize (ftbl_all)
 
       # categorize ftbl_all
       cat_method = "log2pktlen"
@@ -121,8 +127,9 @@ class Simulator:
       # # cat_method = "exppktcnt"
 
       print ("Make categorical ftables", cat_method, K, categories)
+      tlog.start()
       cftbls = make_categoric_ftables (ftbl_all, cat_method, K=K, categories=categories)
-      t_ftbl_cat = time.time () - t3
+      t_ftbl_cat = tlog.diff()
       for ftbl in cftbls:
         # print (ftbl.id, ftbl.name, STime.nowtime)
         dumpname=P.datasetname + '-t'+str(int (STime.timewin))+'-' + ftbl.name
@@ -130,22 +137,10 @@ class Simulator:
         eset = EntropySet (ftbl=ftbl)
         eset.dumpEntropies (dumppath, mode='ab')
       
-      t_entset = time.time ()-t3
+      t_entset = tlog.diff()
 
       
-      t0 = time.time ()
-      # keys = make_categoric_ftbl_keys (ftbl_all, K=13)
-      t_ftbl_keys = time.time () - t0
-
-      # for name in keys:
-      #   dumpname=P.datasetname + '-t'+str(int (STime.timewin))+'-' + name
-      #   dumppath=P.outdir +'/'+ dumpname + '.ent'
-      #   eset = EntropySet (ftbl=ftbl_all, entrykeys=keys[name])
-      #   eset.dumpEntropies (dumppath, mode='ab')
-
-      t_entset_keys = time.time () - t0
-
-      # # draw the histogram
+       # # draw the histogram
       # from histogram import get_ftbl_histogram
       # get_ftbl_histogram (ftbl_all, feat='avg_len')
 
@@ -191,9 +186,8 @@ class Simulator:
         return
 
       print (C.CYN,
-      'psim.run: tProgress=%.2f ftbl_all=%.2f\n'%(t2-t1, t3-t2),
+      'psim.run: tProgress=%.2f ftbl_all=%.2f\n'%(t2-t1, t_ftbl_all),
       '     entset=%.2f  ftbl_cat=%.2f\n'%(t_entset, t_ftbl_cat),
-      'entset_keys=%.2f ftbl_keys=%.2f\n'%(t_entset_keys, t_ftbl_keys),
       'getEntropies=%.2f'%(t_getEntropies),C.NC)
 
       # save entropies to file
