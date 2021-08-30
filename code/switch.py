@@ -4,8 +4,9 @@ import csv
 import subprocess
 import gc
 import dpkt
-from pcapstream import *
-from dpkt_pcap_parser import Parser
+# from pcapreader.pcapstream import *
+from pcapreader.pcapstream import dpkt_pcap2obj
+# from dpkt_pcap_parser import Parser
 import time
 import math
 

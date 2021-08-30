@@ -10,7 +10,7 @@ import pickle # for srialization
 
 from structures import FTDObj
 from flowTable import FlowTable
-from pcapstream import pickle_write
+from pcapreader.pcapstream import pickle_write
 from utilities import eprint
 from utilities import COLOR_CODE as C
 
@@ -116,11 +116,13 @@ class NetShot:
 
 def parse_arguments (argv):
     # pcapdir = "/home/datasets/caida/ddos-20070804"
-    home = os.path.expanduser("~")
-    pcapdir = "/tmp/hessamla/" # input files
-    pcapdir = home+"/ais-install-321/ns-3.28/pcap-output/" # input files
-    nsdir = home+"/ddos-detection/captures_netshot" # output files
-    nsdir = home+"/ddos-detection/captures_maccdc2012" # output files
+    # home = os.path.expanduser("~")
+    # pcapdir = "/tmp/hessamla/" # input files
+    # pcapdir = home+"/ais-install-321/ns-3.28/pcap-output/" # input files
+    # nsdir = home+"/ddos-detection/captures_netshot" # output files
+    # nsdir = home+"/ddos-detection/captures_maccdc2012" # output files
+    pcapdir = "."
+    nsdir = "."
 
     timewin = 60.0
     
@@ -141,6 +143,7 @@ def parse_arguments (argv):
             eprint (usage_msg)
             eprint ("-h (--help)                   Prints this help")
             eprint ("-d (--idir) <pcap-directory>  Directory containing PCAP files")
+            eprint ("-o (--odir) <ftd-directory>   Output directory for flow-table data")
             eprint ("-t (--timewin) <seconds>      Width of each time window in seconds")
             sys.exit()
         elif opt in ("-d", "--idir"):

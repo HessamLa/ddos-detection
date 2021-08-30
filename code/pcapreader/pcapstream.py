@@ -2,7 +2,7 @@ import subprocess
 from utilities import eprint
 from utilities import ipStr2Hex
 from structures import ip_packet
-from dpkt_pcap_parser import Parser
+from .dpkt_pcap_parser import Parser
 import pickle
 
 class pickle_read:
