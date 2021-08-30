@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
+
 import getopt
 import time
 import numpy as np
 import os
 import sys
 import matplotlib.pyplot as plt
+
 import dpkt
-import pickle # for srialization
 
 from structures import FTDObj
 from flowTable import FlowTable
-from pcapreader.pcapstream import pickle_write
+from utilities import pickle_write
 from utilities import eprint
 from utilities import COLOR_CODE as C
+import switch
 
 sys.path.append(".")
 
 # import locals
-import switch
 
 # class FlowTableDump:
 #     def __init__ (self, name, outdir):
@@ -77,7 +78,7 @@ class NetShot:
             print (C.YLW+'Time: {:.2f} to {:.2f}\033[m'.format ( it*self.timewin, (it+1)*self.timewin))
             it += 1
             
-            # Clear all flow tables before proceeding. This is because we need to boot
+            # Clear all flow tables before proceeding. This is because we need to boost
             # the processing speed, and also we only need to store flow table content
             # in each window
             for d in self.switches:
