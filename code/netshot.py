@@ -1,4 +1,4 @@
-#!/usr/bin/env py3
+#!/usr/bin/env python3
 import getopt
 import time
 import numpy as np
