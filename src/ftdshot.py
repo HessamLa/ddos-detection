@@ -9,42 +9,26 @@ import matplotlib.pyplot as plt
 
 import dpkt
 
-from structures import FTDObj
-from flowTable import FlowTable
-from utilities import pickle_write
+import utilities as util
+import datastructures
+
 from utilities import eprint
+from utilities import pickle_write
 from utilities import COLOR_CODE as C
+from datastructures.structures import FTDObj
+from datastructures.flowTable import FlowTable
+
 import switch
 
 sys.path.append(".")
 
-# import locals
-
-# class FlowTableDump:
-#     def __init__ (self, name, outdir):
-#         self.name = name
-
-#         print ("New FTD file Crated:", name)
-#         self.filename = outdir+'/'+name+'.ftd' # Flow-Table Dump
-#         print (self.filename)
-#         self.f = open(self.filename, 'w+b')
-#         if (self.f == None):
-#             eprint ("ERR: Failed to open the file", self.filename)
-#             raise Exception
-#         return
-    
-#     def dump_bin (self, obj):
-#         # eprint ("Dumping :", self.name)
-#         pickle.dump (obj, self.f)
-#         return
-    
-#     def close_file (self):
-#         if (self.f != None):
-#             self.f.close()
-
-
-class NetShot:
-    def __init__ (self, pcapdir='.', nsdir='.', timewin=60.0, filterstr='', protocol=''): # protocol is a comma-separted list
+class FTDshot:
+    """This class is used to generate partial flow-table data (ftd) files from PCAP files.
+    The class works by taking all packets within a time window and crate the flow-table
+    containing the partial flows in that time window, thus taking a shot of flows in a
+    time window.
+    """
+    def __init__ (self, pcapdir='.', ftddir='.', timewin=60.0, filterstr='', protocol=''): # protocol is a comma-separted list
         self.timewin = float(timewin) # SImulation time window in seconds. In each window, the packets will be analyzed
         self.protocols = protocol
         
@@ -52,6 +36,9 @@ class NetShot:
         self.switches = dict ()
         self.netshots = dict ()
 
+        if (not os.path.exists(ftddir)):
+            os.makedirs(ftddir)
+            
         times=[]
         for f in files: # FOREACH switch PCAP file, read the file and create corresponding objects
             # Create a switch object
@@ -60,8 +47,8 @@ class NetShot:
             times.append (float (sd.time))
 
             # Create dumper object for each switch
-            # fd = pickle_write (os.path.splitext (f)[0]+'.ftd', outdir=nsdir)
-            filename = nsdir+'/'+os.path.splitext (f)[0]+'.ftd'
+            # fd = pickle_write (os.path.splitext (f)[0]+'.ftd', outdir=ftddir)
+            filename = ftddir+'/'+os.path.splitext (f)[0]+'.ftd'
             fd = pickle_write (filename, mode='w+b')
             self.netshots [f] = fd
             print ("")
@@ -120,10 +107,10 @@ def parse_arguments (argv):
     # home = os.path.expanduser("~")
     # pcapdir = "/tmp/hessamla/" # input files
     # pcapdir = home+"/ais-install-321/ns-3.28/pcap-output/" # input files
-    # nsdir = home+"/ddos-detection/captures_netshot" # output files
-    # nsdir = home+"/ddos-detection/captures_maccdc2012" # output files
+    # ftddir = home+"/ddos-detection/captures_netshot" # output files
+    # ftddir = home+"/ddos-detection/captures_maccdc2012" # output files
     pcapdir = "."
-    nsdir = "."
+    ftddir = "."
 
     timewin = 60.0
     
@@ -151,25 +138,25 @@ def parse_arguments (argv):
             pcapdir = arg
         elif opt in ("-o", "--odir"):
             print (arg)
-            nsdir = arg
+            ftddir = arg
         elif opt in ("-t", "--timewin"):
             timewin = float (arg)
     
     eprint ("")
     eprint ("*   Dir PCAPs =", pcapdir)
-    eprint ("*Dir NetShots =", nsdir)
+    eprint ("*Dir NetShots =", ftddir)
     eprint ("* Time Window =", timewin , 'seconds')
     eprint ("")
 
-    return pcapdir, nsdir, timewin
+    return pcapdir, ftddir, timewin
 
 if __name__ == "__main__":
-    pcapdir, nsdir, timewin = parse_arguments (sys.argv)
+    pcapdir, ftddir, timewin = parse_arguments (sys.argv)
     # eprint ("Press anykey to coninue...")
     # input()
 
-    capture = NetShot (pcapdir=pcapdir,\
-                     nsdir=nsdir,\
+    capture = FTDshot (pcapdir=pcapdir,\
+                     ftddir=ftddir,\
                      timewin=timewin,\
                      protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP}\
         )

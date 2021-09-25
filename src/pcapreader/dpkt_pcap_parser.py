@@ -7,7 +7,7 @@ import glob
 import ipaddress
 import struct
 import json as j
-from structures import ip_packet
+from datastructures.structures import ip_packet
 from utilities import eprint
 from utilities import ipStr2Hex
 

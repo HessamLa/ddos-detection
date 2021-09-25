@@ -1,70 +1,10 @@
 import subprocess
 from utilities import eprint
 from utilities import ipStr2Hex
-from structures import ip_packet
+from datastructures.structures import ip_packet
 from .dpkt_pcap_parser import Parser
 import pickle
 
-class pickle_read:
-    def __init__ (self, filepath):
-        self.filepath = filepath
-        mode='rb'
-        self.f = open(filepath, mode)
-        if (self.f is None):
-            eprint ("ERR: Openning FTD file", filepath)
-            eprint ("pickle_read.__init__()")
-            exit()
-        return
-        
-    def get_next (self):
-        try:
-            obj = pickle.load(self.f)
-        except EOFError:
-            eprint ("EOFError: Ran out of pickle input.") 
-            eprint ("pickle_read.get_next()")
-            return None
-        return obj
-    
-    def objects (self):
-        while (True):
-            try:
-                obj = pickle.load(self.f)
-                yield obj
-            except EOFError:
-                eprint ("EOFError: Ran out of pickle input.") 
-                eprint ("pickle_read.objects()")
-                return
-    
-    def close_file (self):
-        if (self.f != None):
-            self.f.close()
-        return
-
-class pickle_write:
-    def __init__ (self, filepath, mode='w+b'):
-        self.name = filepath
-        self.filepath = filepath
-        try:
-            self.f = open(self.filepath, mode)
-        except:
-            eprint ("ERR: Failed to open/create the file", self.filepath)
-            eprint ("pickle_write.__init__()")
-            exit ()
-        return
-    
-    def dump (self, obj):
-        try:
-            pickle.dump (obj, self.f)
-        except:
-            eprint ("ERR: Problem dumping the pickle to", self.filepath)
-            eprint ("pickle_write.dump()")
-            exit ()
-        return
-    
-    def close_file (self):
-        if (self.f != None):
-            self.f.close()
-        return
 
 class dpkt_pcap2obj:
     def __init__ (self, pcapfilepath):

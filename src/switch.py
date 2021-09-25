@@ -10,14 +10,15 @@ from pcapreader.pcapstream import dpkt_pcap2obj
 import time
 import math
 
-from structures import FTDObj
+from datastructures.structures import FTDObj
 
+import utilities as util
 from utilities import eprint
 from utilities import HashCollection
 from utilities import COLOR_CODE as C
 
-from flowTable import FlowEntry
-from flowTable import FlowTable
+from datastructures.flowTable import FlowEntry
+from datastructures.flowTable import FlowTable
 
 def Parse_Csv (filepath):
   def conv(s):
@@ -227,15 +228,15 @@ class Switch_Driver:
       
       self.p = self.pcap_reader.get_next_packet () # next packet to be processed in the system
       self.next_pkt_id = 1 # 0th row of the file is expected to be column names
-      self.time = sys.float_info.max
+      self.time = sys.float_info.max  
       if (self.p):
         self.time = float (self.p.ts) # time of the first packet
         self.switch.update_properties (time=self.time)
 
     elif (self.filetype == 'ftd'):
-      self.ftable_img_reader = pickle_read (filepath)
+      self.ftable_img_reader = util.pickle_read (filepath)
 
-    self._done=False  # This is set when there is not more packets or netshots left to process
+    self._done=False  # This is set when there is no more packets or netshots left to process
     return
 
   @property

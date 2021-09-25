@@ -1,11 +1,11 @@
-#!/usr/bin/env py3
+#!/usr/bin/env python3
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 import time
 
+import utilities as util
 from utilities import eprint
-from pcapstream import pickle_read
 
 class EntropyDiagram:
   def __init__ (self, N, fig_title="Entropy diagram"):
@@ -124,7 +124,7 @@ class EntropyDiagram:
 
   def getEntropy (self, filepath):
     if (self.pr == None):
-      self.pr = pickle_read (filepath)
+      self.pr = util.pickle_read (filepath)
     return self.pr.get_next ()
 
 def parse_arguments (argv):
@@ -208,7 +208,7 @@ if __name__ == "__main__":
   pr = []
   for f in filepaths:
     print ("dbg", f)
-    pr.append(pickle_read (f))
+    pr.append(util.pickle_read (f))
   i = 0
   N = len(filepaths) # number of figures, based on number of files
   data = [[] for n in range (N)]

@@ -1,12 +1,11 @@
 import numpy as np
 import itertools
 
-from simulation_time import SimulationTime as STime
-from entropyTable import EntropyTable
-from pcapstream import pickle_write
 
 import utilities as util
 from utilities import eprint
+from utilities.simulation_time import SimulationTime as STime
+from datastructures.entropyTable import EntropyTable
 
 import copy
 
@@ -73,13 +72,13 @@ class EntropySet: # SHOULD USE A BETTER NAME FOR THIS CLASS
             for f in flows.values():
                 pkt_cnt = f.pkt_cnt
                 pkt_len = f.pkt_len
-                agg_table[self.SIP].   add ( f.sip,   pkt_cnt, pkt_len)
-                agg_table[self.DIP].   add ( f.dip,   pkt_cnt, pkt_len)
-                agg_table[self.SP].    add ( f.sport, pkt_cnt, pkt_len)
-                agg_table[self.DP].    add ( f.dport, pkt_cnt, pkt_len)
-                agg_table[self.PROTO]. add ( f.proto, pkt_cnt, pkt_len)
+                agg_table[self.SIP].   add ( f.sip,   f.ts, pkt_cnt, pkt_len)
+                agg_table[self.DIP].   add ( f.dip,   f.ts, pkt_cnt, pkt_len)
+                agg_table[self.SP].    add ( f.sport, f.ts, pkt_cnt, pkt_len)
+                agg_table[self.DP].    add ( f.dport, f.ts, pkt_cnt, pkt_len)
+                agg_table[self.PROTO]. add ( f.proto, f.ts, pkt_cnt, pkt_len)
                 cat_method=1
-                agg_table[self.PCNT].  add ( util.getflowcat (f, cat_method), pkt_cnt, pkt_len)
+                agg_table[self.PCNT].  add ( util.getflowcat (f, cat_method), f.ts, pkt_cnt, pkt_len)
         return agg_table
 
 
@@ -88,14 +87,13 @@ class EntropySet: # SHOULD USE A BETTER NAME FOR THIS CLASS
         def add_entropy_entry (agg_table, f):
             dif_cnt = f.dif_cnt
             dif_len = f.dif_len
-            ts = f.ts
-            agg_table[self.SIP].   add ( f.sip,   ts, dif_cnt, dif_len)
-            agg_table[self.DIP].   add ( f.dip,   ts, dif_cnt, dif_len)
-            agg_table[self.SP].    add ( f.sport, ts, dif_cnt, dif_len)
-            agg_table[self.DP].    add ( f.dport, ts, dif_cnt, dif_len)
-            agg_table[self.PROTO]. add ( f.proto, ts, dif_cnt, dif_len)
+            agg_table[self.SIP].   add ( f.sip,   f.ts, dif_cnt, dif_len)
+            agg_table[self.DIP].   add ( f.dip,   f.ts, dif_cnt, dif_len)
+            agg_table[self.SP].    add ( f.sport, f.ts, dif_cnt, dif_len)
+            agg_table[self.DP].    add ( f.dport, f.ts, dif_cnt, dif_len)
+            agg_table[self.PROTO]. add ( f.proto, f.ts, dif_cnt, dif_len)
             cat_method=1
-            agg_table[self.PCNT].  add ( util.getflowcat (f, cat_method), ts, dif_cnt, dif_len)
+            agg_table[self.PCNT].  add ( util.getflowcat (f, cat_method), f.ts, dif_cnt, dif_len)
 
         if (agg_table==None):
             agg_table = self.__new_etables ()
@@ -160,10 +158,15 @@ class EntropySet: # SHOULD USE A BETTER NAME FOR THIS CLASS
 
     def dumpEntropies (self, filename, mode='wb'):
         if (not hasattr(self, 'dumper')):
-            self.dumper = pickle_write (filename, mode=mode)
+            self.dumper = util.pickle_write (filename, mode=mode)
         self.dumper.dump (self.getEntropies ())
         return
-        
+    
+    def readEntropies (self, filename):
+        # reader = util.pickle_read(filename)
+        # e = reader.
+        pass
+    
     def printInfo (self):
         print ('EntropySet info:')
         print ('Table:Name  |new/total Entries|Entropy (cnt, len)')

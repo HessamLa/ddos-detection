@@ -6,27 +6,32 @@ import os
 import sys
 from pathlib import Path
 import matplotlib.pyplot as plt
+import multiprocessing as mp
+
 import dpkt
 
 HOMEDIR = os.path.expanduser("~")
 sys.path.append(HOMEDIR)
 
 # import locals
-from simulation_time import SimulationTime as STime
-from profiler import Profiler as P
+import utilities
+import utilities as util
+from utilities import eprint
+from utilities import COLOR_CODE as C
+from utilities.simulation_time import SimulationTime as STime
 
+import datastructures
+from datastructures.flowTable import StatsFlowTable as StatsFtbl
+from datastructures.flowTable import make_categoric_ftables
+from datastructures.flowTable import make_categoric_ftbl_keys 
+
+from profiler import Profiler as P
 from controller import Controller
 from switch import Switch_Driver
 from entropy_set import EntropySet
 from entropy_diagram import EntropyDiagram
-from flowTable import StatsFlowTable as StatsFtbl
-from flowTable import make_categoric_ftables
-from flowTable import make_categoric_ftbl_keys 
 
-from utilities import eprint
-from utilities import COLOR_CODE as C
 
-import multiprocessing as mp
 
 class Simulator:
   def __init__ (self, idir='.', timewin=5.0, filterstr='', filetype='pcap', protocol='',\
@@ -77,9 +82,7 @@ class Simulator:
       it += 1
       # all switches run
         
-      # clear all tables
-      # for d in self.switches:
-      #   self.switches[d].switch.flow_table.clear()
+      # reset everything
       self.controller.ftbl_all.clear()
       self.entset.reinit ()
       
@@ -90,8 +93,9 @@ class Simulator:
       
       # if all switches are done getting new packets, then 
       for d in self.switches:
-        if self.switches[d].is_done == False:
-          self.switches[d].progress ()
+        switch = self.switches[d]
+        if switch.is_done == False:
+          switch.progress ()
 
       t2 = time.time()
       # controller runs and collects stats from switches
@@ -183,8 +187,7 @@ class Simulator:
       
       def savePickle (data, attr, filename, outdir=None):
         if (not hasattr(self, attr)):
-          from pcapstream import pickle_write
-          pw = pickle_write (filename, mode='w+b')
+          pw = util.pickle_write (filename, mode='w+b')
           setattr(self, attr, pw)
         pw = getattr (self, attr)
         pw.dump (data)
@@ -231,7 +234,7 @@ def parse_arguments (argv):
   inputdir = "/tmp/hessamla/"
   inputtype = "pcap"
 
-  inputdir = "/home/hessamla/ddos-detection/captures_netshot/"
+  inputdir = "~/ddos-detection/captures_netshot/"
   inputtype = "ftd" #Flow-Table Dump
   P.outdir = os.path.dirname(os.path.abspath(__file__))+'/../out'
   P.outdir = os.path.abspath(P.outdir)
@@ -318,6 +321,7 @@ def parse_arguments (argv):
       exit()
 
   eprint ("")
+  input("Press any key to exit")
 
   return inputdir, inputtype, timewin, show_image
 

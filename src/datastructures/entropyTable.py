@@ -1,12 +1,12 @@
-from structures import AssociativeEntry
-from structures import AssociativeTable
-from structures import ip_packet
+from .structures import AssociativeEntry
+from .structures import AssociativeTable
+from .structures import ip_packet
 
 from utilities import eprint
+from utilities import entropy
 import numpy as np
 
 import time
-from entropyfunction import entropy
 
 
 class EntropyEntry (AssociativeEntry):

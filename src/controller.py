@@ -1,4 +1,4 @@
-from flowTable import FlowTable
+from datastructures.flowTable import FlowTable
 import math
 from utilities import eprint
 #from switch import *

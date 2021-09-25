@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from enum import Enum
-from utilities import eprint
 import copy
+from utilities import eprint
 
 class ip_packet():
     def __init__ (self):
