@@ -2,12 +2,12 @@ import sys
 import pickle
 
 from .helpers import eprint
-from datastructures import structures
-from datastructures.structures import FTDObj
+# from datastructures import structures
+# from datastructures.structures import FTDObj
 
 class pickle_read:
     def __init__ (self, filepath: str):
-        from datastructures import structures
+        # from datastructures import structures
         self.filepath = filepath
         mode='rb'
         self.f = open(filepath, mode)
