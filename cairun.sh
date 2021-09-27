@@ -45,9 +45,9 @@ if [[ $1 = ftdshot ]] ; then
   # sudo mkdir $FTD_DIR
 
   c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-nshots.tmp"
-  c="srun $c"  # this line is added for slurm job manager
+  # c="srun $c"  # this line is added for slurm job manager
   echo $c;
-  # eval $c
+  eval $c
 
   # echo "sudo rm $PIPE"
   # sudo rm $PIPE
@@ -93,7 +93,8 @@ do
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
     # c="${CODE_DIR}/psim.py -d $PCAP_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -t $T -e $ENTDST"
-    c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
+    # c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
+    c="srun -n 1 $c &" # to make sure each job has its own processor, it is best to use srun -n 1
     echo "* |Time Window             ${T}s"
     echo "* |NShot Source Dir        $FTD_DIR"
     echo "* |Entropies Destination   $ENTDST"
@@ -101,9 +102,6 @@ do
     echo "* |$c" 
     echo "*"
     eval $c
-
-    # ./psim.py -f $FTD_DIR -t $T -e $ENTDST > $STATDST
-    # $sleep 5
 done
 
 # TIME=15

@@ -121,7 +121,7 @@ def parse_arguments (argv):
         eprint (usage_msg)
 
     try:
-        opts, args = getopt.getopt(argv[1:],"hcd:t:o:",["help", "idir=", "timewin=", "odir"])
+        opts, args = getopt.getopt(argv[1:],"hcp:t:o:",["help", "idir=", "timewin=", "odir"])
     except getopt.GetoptError:
         eprint ('ERR: Problem reading arguments.')
         eprint (usage_msg)
@@ -130,11 +130,11 @@ def parse_arguments (argv):
         if opt in ("-h", "--help"):
             eprint (usage_msg)
             eprint ("-h (--help)                   Prints this help")
-            eprint ("-d (--idir) <pcap-directory>  Directory containing PCAP files")
+            eprint ("-p (--idir) <pcap-directory>  Directory containing PCAP files")
             eprint ("-o (--odir) <ftd-directory>   Output directory for flow-table data")
             eprint ("-t (--timewin) <seconds>      Width of each time window in seconds")
             sys.exit()
-        elif opt in ("-d", "--idir"):
+        elif opt in ("-p", "--idir"):
             pcapdir = arg
         elif opt in ("-o", "--odir"):
             print (arg)

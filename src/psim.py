@@ -51,7 +51,8 @@ class Simulator:
     self.switches = dict()
     self.controller = Controller ()
     self.entset = EntropySet()
-    self.entropyDiagram = EntropyDiagram (N=len (files))
+    if(show_image):
+      self.entropyDiagram = EntropyDiagram (N=len (files))
     
     times=[]
     for f in files: # FOREACH switch-csv file, read the file and create corresponding switch obj
@@ -244,9 +245,9 @@ def parse_arguments (argv):
   timewin = 60
   show_image = False
   
-  usage_msg = 'Usage: {} -df <input-directory> -o <output-ftd-dirctory>'.format (argv[0])
+  usage_msg = 'Usage: {} -[p,f] <input-directory> -o <output-ftd-dirctory>'.format (argv[0])
   try:
-    opts, args = getopt.getopt(argv[1:],"hid:f:t:o:e:s:",
+    opts, args = getopt.getopt(argv[1:],"hip:f:t:o:e:s:",
                   ["help", "show-image", "pcapdir", "ftddir", "timewin", "odir",
                   "entropy-path", "stats-path"])
   except getopt.GetoptError:
@@ -258,16 +259,16 @@ def parse_arguments (argv):
       eprint (usage_msg)
       eprint ("-h (--help)                Prints this help")
       eprint ("-t (--timewin) <seconds>   Width of each time window in seconds")
-      eprint ("-d (--pcapdir) <pcap-dir>  Directory containing PCAP files")
+      eprint ("-p (--pcapdir) <pcap-dir>  Directory containing PCAP files")
       eprint ("-f (--ftddir) <ftd-dir>    Directory containing Flow-Table Dump files")
       eprint ("-o (--outdir) <out-dir>    Output directory, mainly for dump (pickle) files")
-      eprint ("-e (--entropy-path) <path> Path to the output entropy dumps (pickle) file")
-      eprint ("-s (--stats-path) <path>   Path to the output statistics dumps (pickle) file")
+      eprint ("-e (--entropy-file) <path> Path to the output entropy dumps (pickle) file")
+      eprint ("-s (--stats-file) <path>   Path to the output statistics dumps (pickle) file")
       eprint ("-i (--show-image)          Show the output image")
       sys.exit()
     elif opt in ("-i", "--show-image"):
       show_image = True
-    elif opt in ("-d", "--pcapdir"):
+    elif opt in ("-p", "--pcapdir"):
       if (len (arg)>1):
         while (arg[-1] == '/'):
           arg = arg[:-1]
@@ -295,9 +296,7 @@ def parse_arguments (argv):
       P.outdir = os.path.abspath(arg)
     elif opt in ("-t", "--timewin"):
       timewin = float (arg)
-  # if (len (args) > 0):
-  #   inputfile = args[-1]
-  else:
+  if(len (args)==1):
     eprint ('WARN: No arguments are passed. Using default values.')
   
   
@@ -310,27 +309,30 @@ def parse_arguments (argv):
   eprint ('Show Image        ', show_image)
   eprint ('Save Entropy Dump as', P.entropypath)
   
-  for d in [inputdir, P.outdir]:
+  if (not os.path.isdir (inputdir)): 
+    eprint ("ERR: Directory non existant:", inputdir)
+    exit()
+  for d in [P.outdir]:
     if (not os.path.isdir (d)):
-      eprint ("ERR: Directory non existant:", d)
-      exit()
+      eprint ("WARN: Directory non existant:", d)
+      eprint ("Creating the directory")
+      os.makedirs(d)
   for f in [P.entropypath, P.statspath]:
     d = os.path.dirname(f)
     if (len (d) != 0 and not os.path.isdir (d)):
-      eprint ("ERR: Directory non existant:", f)
-      exit()
-
-  eprint ("")
-  input("Press any key to exit")
+      eprint ("WARN: Directory non existant:", f)
+      eprint ("Creating the directory")
+      os.makedirs(d)
 
   return inputdir, inputtype, timewin, show_image
 
 if __name__ == "__main__":
+  from datetime import datetime
   eprint (os.getcwd())
   eprint (os.path.dirname(os.path.abspath(__file__)))
   idir, inputtype, timewin, show_image = parse_arguments (sys.argv)
 
-  print (idir, inputtype, timewin)
+  print (datetime.now(), f"started t{timewin} type:{inputtype} dir:{idir}")
   sim = Simulator (idir=idir, timewin=timewin,\
     filterstr='',\
     filetype=inputtype,\
@@ -339,6 +341,7 @@ if __name__ == "__main__":
     idle_timeout=300\
     )
   sim.run()
+  print (datetime.now(), f"finished t{timewin}")
   
 
 

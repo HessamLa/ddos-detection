@@ -2,9 +2,12 @@ import sys
 import pickle
 
 from .helpers import eprint
+from datastructures import structures
+from datastructures.structures import FTDObj
 
 class pickle_read:
     def __init__ (self, filepath: str):
+        from datastructures import structures
         self.filepath = filepath
         mode='rb'
         self.f = open(filepath, mode)
@@ -15,9 +18,9 @@ class pickle_read:
         return
 
     def load (self):
-        print("inside pickle_read.load()")
+        # print("inside pickle_read.load()")
         try:
-            print("inside pickle_read.load() try")
+            # print("inside pickle_read.load() try")
             obj = pickle.load (self.f)
         except:
             eprint ("ERR: Failed to open/read the file". self.filepath)
@@ -26,8 +29,14 @@ class pickle_read:
         return obj
 
     def get_next (self):
+        # from datastructures import structures
+        # print("pickle_read.get_next()")
+        # obj = pickle.load(self.f)
+        # print("pickle_read.get_next()", type(obj))
         try:
+            # print("inside pickle_read.get_next()")
             obj = pickle.load(self.f)
+            # print("pickle_read.get_next() 2", type(obj))
         except EOFError:
             return None
         except:
@@ -52,7 +61,7 @@ class pickle_read:
         return
 
 class pickle_write:
-    def __init__ (self, filepath, mode='w+b'):
+    def __init__ (self, filepath, mode='wb'):
         self.name = filepath
         self.filepath = filepath
         try:

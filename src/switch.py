@@ -10,13 +10,13 @@ from pcapreader.pcapstream import dpkt_pcap2obj
 import time
 import math
 
-from datastructures.structures import FTDObj
 
 import utilities as util
 from utilities import eprint
 from utilities import HashCollection
 from utilities import COLOR_CODE as C
 
+from datastructures.structures import FTDObj
 from datastructures.flowTable import FlowEntry
 from datastructures.flowTable import FlowTable
 
