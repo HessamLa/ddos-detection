@@ -1,17 +1,17 @@
 #!/bin/bash
 
 #SBATCH -J caida_t10
-#SBATCH -p dl
+#SBATCH -p general
 #SBATCH -o log_%j.txt
 #SBATCH -e log_%j.err
 #SBATCH --nodes=1
 #SBATCH --time=8:00:00
-#SBATCH --ntasks-per-node=1
+#SBATCH --ntasks-per-node=5
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=80G
 
 DDOS_DIR=~/ddos-detection
-CODE_DIR=${DDOS_DIR}/code
+CODE_DIR=${DDOS_DIR}/src
 
 DS_NAME=maccdc2012
 DS_NAME=caida
@@ -80,7 +80,8 @@ do
     echo "* Make Entropies and Statistics ******"
     STATDST="${OUT_DIR}/stats.stt"
     ENTDST="${OUT_DIR}/entropies.ent"
-    LOGFILE="log-t${T}.tmp"; echo "" > $LOGFILE
+    mkdir logs
+    LOGFILE="logs/log-t${T}.tmp"; echo "" > $LOGFILE
     echo "Logging" >> $LOGFILE
     echo "Time Win: ${T} seconds" >> $LOGFILE
     echo "Ent Dest: $ENTDST" >> $LOGFILE
@@ -92,7 +93,7 @@ do
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
     # c="${CODE_DIR}/psim.py -d $PCAP_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -t $T -e $ENTDST"
-    c="srun -o log${T}_%j.txt $c &"  # this line is added for slurm job manager
+    c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
     echo "* |Time Window             ${T}s"
     echo "* |NShot Source Dir        $FTD_DIR"
     echo "* |Entropies Destination   $ENTDST"
@@ -110,6 +111,7 @@ done
 # mkdir $FTD_DIR
 # c="${CODE_DIR}/ftdshot.py -d $PCAP_DIR -o $FTD_DIR -t $TIME > log.tmp"
 # echo $c; eval $c
+
 wait # this line is added for slurm job manager
 date
 
