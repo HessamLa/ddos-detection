@@ -1,51 +1,70 @@
 #!/bin/bash
 
-DDOS_DIR=~/ddos-detection
-CODE_DIR=${DDOS_DIR}/code
+#SBATCH -J test
+#SBATCH -p general
+#SBATCH -o testlog_%j.txt
+#SBATCH -e testlog_%j.err
+#SBATCH --nodes=1
+#SBATCH --time=8:00:00
+#SBATCH --ntasks-per-node=5
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=80G
 
-DS_DIR=$DDOS_DIR/datasets
+DDOS_DIR=~/ddos-detection
+CODE_DIR=${DDOS_DIR}/src
+
 DS_NAME=maccdc2012
 DS_NAME=caida
+DS_NAME=cicddos2019
+DS_DIR=$DDOS_DIR/datasets/$DS_NAME
 
-NSHOT_DIR=${DS_DIR}/${DS_NAME}
-PCAP_DIR=${DS_DIR}/${DS_NAME}
+PCAP_DIR=${DS_DIR}/pcap
+FTD_DIR=${DS_DIR}/ftd-t5
 
-OUT_DIR=${DDOS_DIR}/out-temp
-mkdir $OUT_DIR
-rm $OUT_DIR/*
+OUT_DIR=./testoutput
 
-# echo "****************************************"
-# echo "* Making NetShots **********************"
-TIME=5
-PIPE=${PCAP_DIR}/p.pcap
-echo "* PCAP Source Dir:       $PCAP_DIR"
-echo "* NShot Destination Dir: $NSHOT_DIR"
-echo "* Pipe:                  $PIPE"
-echo "* Time Resolution:       ${TIME}s"
-# echo "sudo mkfifo $PIPE"
-# sudo mkfifo $PIPE
-# echo "sudo chmod 0666 $PIPE"
-# sudo chmod 0666 $PIPE
-# echo "sudo mergecap -F pcap -w -  $PCAP_DIR/res/*.pcap > $PIPE &"
-# sudo mergecap -F pcap -w -  $PCAP_DIR/res/*.pcap > $PIPE &
-# echo "sudo mkdir $NSHOT_DIR"
-# sudo mkdir $NSHOT_DIR
+echo "**********_T_E_S_T____R_U_N_***********"
+echo "********  Dataset $DS_NAME  ***********"
 
-# echo "$CODE_DIR/netshot.py -d $PCAP_DIR -o $NSHOT_DIR -t $TIME > log.tmp"
-# $CODE_DIR/netshot.py -d $PCAP_DIR -o $NSHOT_DIR -t $TIME > log.tmp
+if [[ $1 = ftdshot ]] ; then
+  date
+  echo "***** SKIP FTD ******"
+  echo "****************************************"
+  echo "* Making NetShots **********************"
+  TIME=5
+  FTD_DIR=${DS_DIR}/testftd-t${TIME}
+  mkdir $FTD_DIR
+  echo "* PCAP Source Dir:       $PCAP_DIR"
+  echo "* NShot Destination Dir: $FTD_DIR"
+  echo "* Time Resolution:       ${TIME}s"
+  # echo "* Pipe:                  $PIPE"
+  # PIPE=${PCAP_DIR}/p.pcap
+  # c="sudo mkfifo $PIPE"
+  # echo $c; eval $c
 
-# echo "sudo rm $PIPE"
-# sudo rm $PIPE
+  # echo "sudo chmod 0666 $PIPE"
+  # sudo chmod 0666 $PIPE
+  # echo "sudo mergecap -F pcap -w -  $PCAP_DIR/res/*.pcap > $PIPE &"
+  # sudo mergecap -F pcap -w -  $PCAP_DIR/res/*.pcap > $PIPE &
+  # echo "sudo mkdir $FTD_DIR"
+  # sudo mkdir $FTD_DIR
 
-times=( 60 30 10 5 )
-times=( 30 )
+  c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-nshots.tmp"
+  # c="srun $c"  # this line is added for slurm job manager
+  echo $c;
+  eval $c
 
-if ! [ -z "$1" ] ; then
+  # echo "sudo rm $PIPE"
+  # sudo rm $PIPE
+
+elif ! [ -z "$1" ] ; then
   T=$1
   echo "t is $T"
 fi
 if [ -z "$T" ] ; then
-  echo "Running for times ${times[@]} seconds"
+  times=( 60 30 20 10 5 )
+  # times=( 20 10 5 )
+  echo "Running for times 60, 30, 10 and 5 seconds"
   sleep 2
 elif ! [[ $T =~ ^[0-9]+$ ]] ; then
   echo "ERROR: The passed argument is not a number \"$T\"" >&2; exit 1
@@ -55,35 +74,49 @@ fi
 
 for T in "${times[@]}"
 do
+    date
+    echo ""
     echo "****************************************"
-    echo "* Making Entropies and Statistics ******"
-    STATDST="${OUT_DIR}/${DS_NAME}all_t${T}.stt"
-    ENTDST="${OUT_DIR}/${DS_NAME}all_t${T}.ent"
-    c="${CODE_DIR}/psim.py -f $NSHOT_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST > log.tmp"
-    c="${CODE_DIR}/psim.py -f $NSHOT_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i > log.tmp"
-    c="${CODE_DIR}/psim.py -f $NSHOT_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
-    # c="${CODE_DIR}/psim.py -f $NSHOT_DIR -t $T -i "#-e $ENTDST"
-    # c="${CODE_DIR}/psim.py -d $PCAP_DIR -t $T -i "
-    # c="${CODE_DIR}/psim.py -f $NSHOT_DIR -t $T -i "
+    echo "      REMAKE $OUT_DIR"
+    OUT_DIR=./testoutput-t${T}
+    rm -rf $OUT_DIR
+    mkdir $OUT_DIR
+    echo ""
+    echo "* Make Entropies and Statistics ******"
+    STATDST="${OUT_DIR}/stats.stt"
+    ENTDST="${OUT_DIR}/entropies.ent"
+    mkdir logs
+    LOGFILE="logs/testlog-t${T}.tmp"; echo "" > $LOGFILE
+    echo "Logging" >> $LOGFILE
+    echo "Time Win: ${T} seconds" >> $LOGFILE
+    echo "Ent Dest: $ENTDST" >> $LOGFILE
+    echo "Stt Dest: $STATDST" >> $LOGFILE
+
+
+    c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST >> $LOGFILE"
+    # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
+    # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
+    # c="${CODE_DIR}/psim.py -d $PCAP_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
+    # c="${CODE_DIR}/psim.py -f $FTD_DIR -t $T -e $ENTDST"
+    # c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
+    # c="srun -n 1 $c &" # to make sure each job has its own processor, it is best to use srun -n 1
     echo "* |Time Window             ${T}s"
-    echo "* |NShot Source Dir        $NSHOT_DIR"
+    echo "* |NShot Source Dir        $FTD_DIR"
     echo "* |Entropies Destination   $ENTDST"
     echo "* |Statistics Destination  $STATDST"
-    echo "* |$c"
+    echo "* |$c" 
     echo "*"
     eval $c
-    # ./psim.py -f $NSHOT_DIR -t $T -e $ENTDST > $STATDST
-    # $sleep 5
 done
 
+# TIME=15
+# FTD_DIR=${DS_DIR}/${DS_NAME}/t$TIME
+# mkdir $FTD_DIR
+# c="${CODE_DIR}/ftdshot.py -d $PCAP_DIR -o $FTD_DIR -t $TIME > log.tmp"
+# echo $c; eval $c
 
-
-
-
-
-
-
-
+wait # this line is added for slurm job manager
+date
 
 
 

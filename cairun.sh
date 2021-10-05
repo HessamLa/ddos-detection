@@ -15,6 +15,8 @@ CODE_DIR=${DDOS_DIR}/src
 
 DS_NAME=maccdc2012
 DS_NAME=caida
+DS_NAME=cicddos2019
+
 DS_DIR=$DDOS_DIR/datasets/$DS_NAME
 
 PCAP_DIR=${DS_DIR}/pcap

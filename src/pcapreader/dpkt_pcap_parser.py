@@ -191,11 +191,11 @@ class Parser (object):
     def _open_pcap (self):
         fname = self.filename
         if fname [-3:] == '.gz':
-            print >> sys.stderr, 'Opening compressed file: %s'%fname
+            eprint('Opening compressed file:', fname)
             f = gzip.open (fname, 'rb')
         else:
             f = open (fname, 'rb')
-        eprint ('PCAP Filename: ', fname)
+        eprint ('PCAP Filename:', fname)
         self.pcap = dpkt.pcap.Reader (f)
         # self._iter = iter(self)
         dlink = self.pcap.datalink()
@@ -243,6 +243,9 @@ class Parser (object):
         p.ttl = ip.ttl
         p.len = ip.len
         return p
+    
+    def process_ipv6 (self, ts, ipv6):
+        pass
 
     def getnext (self, type='str'):
         funcname = 'get_%s'%type
@@ -312,8 +315,7 @@ class Parser (object):
         return p
 
     def _fill_cache (self, count=0):
-        import time
-        t1 = time.time()
+        """This method is used to speed up reading the pcap file"""
         if count==0:
             count=self.cache_depth
         self.cache_index=0
@@ -342,8 +344,6 @@ class Parser (object):
             # else: # if buf == None:
             #     break
 
-        t2 = time.time()
-        # print ("_fill_cache() count=%d time=%.2f"%(self.cache_cnt, t2-t1))
         return self.cache_cnt
 
     def __iter__ (self):
@@ -357,16 +357,19 @@ class Parser (object):
         #     yield buf
 
     def __next__ (self):
+        """In order to speed up, cache system is used"""
         # return next(iter(self))
-        
-        if self.cache_index == self.cache_cnt:
+        if self.cache_index < self.cache_cnt:
+            p = self.cache [self.cache_index]
+            self.cache_index += 1
+            return p
+        else:
             ret = self._fill_cache()
             if ret==0:
                 raise StopIteration
-        
-        p = self.cache [self.cache_index]
-        self.cache_index += 1
-        return p
+            p = self.cache [self.cache_index]
+            self.cache_index += 1
+            return p
 
 class Test():
     def __init__(self):
