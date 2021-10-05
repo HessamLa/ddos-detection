@@ -224,7 +224,7 @@ class Simulator:
 
     # finalize
     # raw_input ("PRESS SOME KEY TO TERMINATE")
-    print ("psim.run(): PRESS SOME KEY TO TERMINATE")
+    # print ("psim.run(): PRESS SOME KEY TO TERMINATE")
     # os.system("pause")
 
 def parse_arguments (argv):

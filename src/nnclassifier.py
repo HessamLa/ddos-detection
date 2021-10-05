@@ -4,96 +4,106 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 import importlib
+from re import VERBOSE
 from types import DynamicClassAttribute
 import numpy as np
 import pandas as pd
 import concurrent
 import tensorflow as tf
 
-import utilities as util # util.MakeDataset util.PrepareDataset
-
-basepath = "/N/slate/hessamla/ddos-datasets"
-# load data
-entdirpath = f"{basepath}/caida/output-t10"
-df_alldir=f"{basepath}/caida/output-t10-df"
-df_allpath=f"{df_alldir}/output-t10-csv"
-df_allpath=f"{df_alldir}/output-t10-df"
-
-
 class DummyClass:
-  def __init__(self):
-    pass
+  def __init__(self) -> None:
+      pass
+profile=DummyClass()
 
-#%%
-df_all = [pd.read_pickle(f"{df_alldir}/{file}") for file in os.listdir(df_alldir) if file.endswith("_df.gzip")]
-print(len(df_all))
-print(df_all[0].head())
-# %%
-df_all = pd.read_csv(df_allpath, header=[0,1,2,3], skip_blank_lines=True)
-df_all['srcip'].head()
+profile.timewin="10"
+
+profile.model=DummyClass()
+profile.model.name="CRNN_DDoS_Detection"
+profile.model.historydepth=32
+profile.model.input_size=160 # total 160 columns
+profile.model.num_classes=2
+profile.model.lstm_size = 40
+
+profile.model.ratio_train = 0.70
+profile.model.ratio_valid = 0.15
+profile.model.ratio_test  = profile.model.ratio_train + profile.model.ratio_valid
+
+timewin="10"
+basedir=os.path.expanduser("~/ddos-detection")
+codedir=f"{basedir}/src"
+dsname="caida"
+dsdir=f"{basedir}/datasets/{dsname}"
+# ftddir=f"{dsdir}/ftd-t5"
+dfdir=f"{dsdir}/output-t{timewin}"
+dfpath=f"{dfdir}/all.df"
 
 # %%
-
-df_all['srcip','flowcnt'].iloc[155:170].plot()
-df_all['dstip','flowcnt'].iloc[155:170].plot()
+df = pd.read_pickle(dfpath)
 # %%
-# set labels. index 159 (1590 seconds) and onwards are attack
-labels=np.array([0]*df_all.shape[0])
-labels[159:]=1
-df_all['labels']=labels
+df.tail()
+df.srcip
+#%% 
+## Add labels, beyond time 1560 is attack
+df["labels"]=np.array([0]*df.shape[0])
+df.loc[df.time>1560, ['labels']]=1
+
 
 # %%
+## Make subsequences
+#make subsequences
+import utilities.MakeDataset as md
+
 iterables=[['dstip', 'srcip', 'dstpt', 'srcpt', 'proto'],
-            ['flowcnt', 'pktlen'],
+            ['pktcnt', 'pktlen'],
             ['new','old'],
-            ['k0', 'k1', 'k2', 'k3']]
+            ['k0', 'k1', 'k2', 'k3', 'k4']]
 datacols=pd.MultiIndex.from_product(iterables)
 
-INPUT_tSIZE=32
-LABEL_SIZE=1
+profile.model.input_size=len(datacols)
+data=[]
+labels=[]
+for i in range(df.shape[0] - profile.model.historydepth):
+  data.append(df.iloc[i:i+profile.model.historydepth][datacols])
+  labels.append(df.iloc[i+profile.model.historydepth]['labels'])
 
-#make subsequences
-subsequences=[]
-for i in range(df_all.shape[0]-INPUT_tSIZE):
-  subsequences.append(df_all.iloc[i:i+INPUT_tSIZE])
-
-#make batches of subsequences
-dfs=[]
-for i in range(len(subsequences)-INPUT_tSIZE-1):
-  seq=[subsequences[k] for k in range(i, i+INPUT_tSIZE+1)]
-  dfs.append(seq)
-
-print(len(dfs[0]))
-print(len(dfs[0][0]))
-print(dfs[0][0][datacols])
-
-NUM_CLASSES=2
-# %%
-# make train data
-
-trainsize=int(len(dfs)*0.70)
-validsize=int(len(dfs)*0.15)
-testsize=len(dfs)-(trainsize+validsize)
-
+#separate data and labels and shuffle them 
 import random
-random.shuffle(dfs)
+bag=list(zip(data,labels))
+random.shuffle(bag)
+data,labels=zip(*bag)
 
-dfs_train=dfs[:trainsize]
-dfs_valid=dfs[trainsize:trainsize+validsize]
-dfs_test=dfs[trainsize+validsize:]
+trainsize=int(len(data)*profile.model.ratio_train)
+validsize=int(len(data)*profile.model.ratio_valid)
+testsize=len(data)-(trainsize+validsize)
+
+dfs_train={'data':data[:trainsize], 'labels':labels[:trainsize]}
+dfs_valid={'data':data[trainsize:trainsize+validsize], 'labels':labels[trainsize:trainsize+validsize]}
+dfs_test={'data':data[trainsize+validsize:],'labels':labels[trainsize+validsize:]}
+
+# %%
+## Put the data into dataset classes
+
+
 ds=DummyClass()
 ds.x=DummyClass()
 ds.y=DummyClass()
-ds.x.train=[df[datacols].values for df in dfs_train]
-ds.y.train=[df['labels'].values for df in dfs_train]
-ds.y.train = tf.keras.utils.to_categorical ( ds.y.train, num_classes=NUM_CLASSES)
 
-ds.x.valid=[df[datacols].values for df in dfs_valid]
-ds.y.valid=[df['labels'].values for df in dfs_valid]
-ds.y.valid = tf.keras.utils.to_categorical ( ds.y.valid, num_classes=NUM_CLASSES)
+ds.x.train=np.array([d.values for d in dfs_train['data']])
+ds.y.train=np.array([d.values for d in dfs_train['labels']])
+ds.y.train = tf.keras.utils.to_categorical ( ds.y.train, num_classes=profile.model.num_classes)
 
-ds.x.test=[df[datacols].values for df in dfs_test]
-ds.y.test=[df['labels'].values for df in dfs_test]
+ds.x.valid= np.array([d.values for d in dfs_valid['data']])
+ds.y.valid= np.array([d.values for d in dfs_valid['labels']])
+ds.y.valid = tf.keras.utils.to_categorical ( ds.y.valid, num_classes=profile.model.num_classes)
+
+ds.x.test= np.array([d.values for d in dfs_test['data']])
+ds.y.test= np.array([d.values for d in dfs_test['labels']])
+
+
+# %%
+print(ds.x.valid.shape)
+print(ds.y.valid.shape)
 
 # %%
 
@@ -144,7 +154,7 @@ def MakeCRNNModel(inputshape, lstm_units, num_classes, model_name="CRNN_DDoS_Det
                 # loss='mean_squared_error'
   return model
 
-def FitModel(model, train_data,val_data, profile):    
+def FitModel(model, train_data,val_data, profile, verbose=False):    
   # Create a callback that saves the model's weights every 5 epochs
   cp_callback = tf.keras.callbacks.ModelCheckpoint(
       filepath=profile.path.checkpoint_path, 
@@ -158,7 +168,7 @@ def FitModel(model, train_data,val_data, profile):
                       steps_per_epoch=profile.training.EVALUATION_INTERVAL,
                       validation_data=val_data,
                       validation_steps=50,
-                      verbose=1, # 0 no output, 1 full output
+                      verbose=verbose, # 0 no output, 1 full output
                       callbacks=[cp_callback])
 
   # Save model and history
@@ -169,7 +179,6 @@ def FitModel(model, train_data,val_data, profile):
     file_pi.close()
   
   return
-profile=DummyClass()
 
 profile.path=DummyClass()
 profile.path.root = "."
@@ -177,16 +186,12 @@ profile.path.checkpoint_path=profile.path.root+"/model/CRNN_DDoS_Detection/check
 profile.path.prepdata = profile.path.root+"/prepdata_synth" 
 profile.path.modeldata = profile.path.root+"/modeldata"
 profile.path.checkpoint_path = profile.path.modeldata+"/ckpt"
-profile.path.save_model_path = profile.path.modeldata+"/model"
+profile.path.model = profile.path.modeldata+"/model"
 profile.path.training_history = profile.path.modeldata+'/training_history'
 
-profile.model=DummyClass()
-profile.model.name="CRNN_DDoS_Detection"
-profile.model.input_size=INPUT_tSIZE
 profile.training=DummyClass()
 profile.training.EPOCHS=100
 profile.training.EVALUATION_INTERVAL=50
-profile.training.EPOCHS=100
 
 
 profile.model.inputshape = ds.x.train[0].shape
@@ -206,8 +211,7 @@ val_data = tf.data.Dataset.from_tensor_slices((ds.x.valid, ds.y.valid))
 val_data = val_data.batch(profile.training.BATCH_SIZE).repeat()
 
 
-LSTM_UNITS=1
-model = MakeCRNNModel(profile.model.inputshape, LSTM_UNITS, NUM_CLASSES, model_name=profile.model.name)
+model = MakeCRNNModel(profile.model.inputshape, profile.model.lstm_size, profile.model.num_classes, model_name=profile.model.name)
 model.summary()
 print(profile.model.inputshape)
 FitModel(model, train_data, val_data, profile)

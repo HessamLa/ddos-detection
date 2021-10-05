@@ -60,14 +60,14 @@ def make_categoric_ftbl_keys (ftbl, K, mode='log2pktcnt'):
   Lg2pktCnt: 0, 1, 2, ... (K-1)+
   State: new, old, any
   """
-  def mkname (state, lg2pktcnt):
+  def mkname (state, category):
     if (state == 0):
-      return "new-k"+str(lg2pktcnt)
+      return "new-k"+str(category)
     elif (state == 1):
-      return "prv-k"+str(lg2pktcnt)
+      return "prv-k"+str(category)
     elif (state == 2):
-      return "any-k"+str(lg2pktcnt)
-  
+      return "any-k"+str(category)
+
   _new = 0
   _prv = 1
   _any = 2

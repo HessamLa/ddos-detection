@@ -98,6 +98,7 @@ class EntropyTable (AssociativeTable):
         
         # t1 = time.time()
         else:
+            # iterate over each entropy entry in the table and convert it to a numpy array
             array = np.array ([[ent.dif_cnt, ent.dif_len] for ent in self if ent.dirty==True], dtype='f')
             self.__entropy = entropy (array)
             retval = self.__entropy
