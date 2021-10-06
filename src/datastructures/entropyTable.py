@@ -1,6 +1,6 @@
 from .structures import AssociativeEntry
 from .structures import AssociativeTable
-from .structures import ip_packet
+from .structures import flow_packet
 
 from utilities import eprint
 from utilities import entropy

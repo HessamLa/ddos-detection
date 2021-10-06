@@ -3,17 +3,19 @@ from enum import Enum
 import copy
 from utilities import eprint
 
-class ip_packet():
+class flow_packet():
+    """This class is a struct that contains flow-related information of each packet"""
     def __init__ (self):
-        self.ts    = 0 # time-stamp; time of last modified
-        self.tc    = 0 # time created; time of 
-        self.sip   = 0x00000000
-        self.dip   = 0x00000000
-        self.proto = 0
-        self.sport = 0
-        self.dport = 0
-        self.len   = 0
-        self.ttl   = 0
+        self.type    = None # packet type
+        self.tc      = 0 # timestamp of the first packet of the flow
+        self.ts      = 0 # timestamp of the this packet of the flow
+        self.len     = 0
+        self.ttl     = 0
+        self.srcaddr = 0x00000000 # source address
+        self.dstaddr = 0x00000000 # destination address
+        self.proto   = 0          # transport layer protocol
+        self.srcprt  = 0          # source port number
+        self.dstprt  = 0          # destination port number
 
 class AssociativeEntry:
     def __init__ (self, key=None, dirty=None, age=0, ts=None):

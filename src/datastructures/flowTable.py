@@ -1,6 +1,6 @@
 from .structures import AssociativeEntry
 from .structures import AssociativeTable
-from .structures import ip_packet
+from .structures import flow_packet
 
 from utilities import eprint
 from utilities import getflowcat
@@ -104,7 +104,7 @@ def make_categoric_ftbl_keys (ftbl, K, mode='log2pktcnt'):
 class FlowEntry (AssociativeEntry):
   def __init__ (self, hashCode, p):
     """This function, gets a packet
-    hashCode is the signature of the flow. p is an ip_packet pertaining to the flow.
+    hashCode is the signature of the flow. p is an flow_packet pertaining to the flow.
     """
 
     AssociativeEntry.__init__ (self, key=hashCode, dirty=True)
@@ -242,6 +242,10 @@ class FlowTable (AssociativeTable):
 
   def add_packet (self, p):
     """Adds the packet p to the flow table. Returns key of the corresponding entry"""
+    print(p)
+    h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport]))
+    print(h)
+    exit()
     h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
     try:
       self.tbl [h].add (p.ts, 1, p.len)

@@ -30,7 +30,7 @@ if [[ $1 = ftdshot ]] ; then
   echo "* Making NetShots **********************"
   TIME=5
   FTD_DIR=${DS_DIR}/ftd-t${TIME}
-  mkdir $FTD_DIR
+  mkdir -p $FTD_DIR
   echo "* PCAP Source Dir:       $PCAP_DIR"
   echo "* NShot Destination Dir: $FTD_DIR"
   echo "* Time Resolution:       ${TIME}s"
@@ -77,12 +77,12 @@ do
     echo "      REMAKE $OUT_DIR"
     OUT_DIR=${DS_DIR}/output-t${T}
     rm -rf $OUT_DIR
-    mkdir $OUT_DIR
+    mkdir -p $OUT_DIR
     echo ""
     echo "* Make Entropies and Statistics ******"
     STATDST="${OUT_DIR}/stats.stt"
     ENTDST="${OUT_DIR}/entropies.ent"
-    mkdir logs
+    mkdir -p logs
     LOGFILE="logs/log-t${T}.tmp"; echo "" > $LOGFILE
     echo "Logging" >> $LOGFILE
     echo "Time Win: ${T} seconds" >> $LOGFILE

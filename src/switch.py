@@ -316,7 +316,7 @@ class Switch_Driver:
     
     # t=-1 # COMMENT OUT
     # str = "{}".format(self.p .ts) # COMMENT OUT
-    dif = 0
+    timedif = 0
     try:
       while (self.p and self.p.ts < timelim):
         if ( self.protocols==None ):  # If no protocol is given, then accept all packets
@@ -328,7 +328,7 @@ class Switch_Driver:
         t0 = time.time()
         self.p = self.pcap_reader.get_next_packet()
         t1 = time.time()
-        dif += t1-t0
+        timedif += t1-t0
         if (len(packets) >= 100000):
           totalcnt += len (packets)
           yield packets
@@ -342,11 +342,11 @@ class Switch_Driver:
 
     totalcnt += len (packets)
     if (totalcnt > 1):
-      print (self.filename, "|Pkt Cnt:", totalcnt, '|exec time diff:', "{:.3f}".format(dif)) # COMMENT OUT
-    if dif > 1:
+      print (self.filename, "|Pkt Cnt:", totalcnt, '|exec time diff:', "{:.3f}".format(timedif)) # COMMENT OUT
+    if timedif > 1:
       RED='\033[0;31m'
       NC='\033[0m' # No Color
-      print (RED, '  Time elapsed reading packets from pcap:', dif, NC)
+      print (RED, '  Time elapsed reading packets from pcap:', timedif, NC)
     
     yield packets
     return
