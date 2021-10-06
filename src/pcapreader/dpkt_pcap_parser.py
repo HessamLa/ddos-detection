@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 #%%
+if __name__ == "__main__":
+    import sys
+    sys.path.append('./src')
+
 import dpkt
 import gzip
 import sys
@@ -7,7 +11,7 @@ import glob
 import ipaddress
 import struct
 import json as j
-from datastructures.structures import ip_packet
+from datastructures.structures import flow_packet
 from utilities import eprint
 from utilities import ipStr2Hex
 
@@ -18,14 +22,9 @@ LINKTYPE_NULL = 0
 LINKTYPE_ETHERNET = 1
 LINKTYPE_RAW = 101
 
-SKIP_PACKET = -1 
+SKIP_PACKET = -1
 FINISHED = -2
 
-datalinks = {
-    LINKTYPE_NULL     : ('NULL', None),
-    LINKTYPE_ETHERNET : ('ETHERNET', 'handle_ethernet'),
-    LINKTYPE_RAW      : ('RAW_IP', 'handle_ip'),
-}
 ATTRIBUTE = {'time', 'srcip', 'dstip', 'protocol', 'srcprt', 'dstprt', 'length'}
 ETH_TYPES = {dpkt.ethernet.ETH_TYPE_EDP,\
             dpkt.ethernet.ETH_TYPE_PUP,\
@@ -50,23 +49,23 @@ ETH_TYPES = {dpkt.ethernet.ETH_TYPE_EDP,\
             dpkt.ethernet.ETH_TYPE_TEB
             }
 
-def handle_ethernet (ts, pkt, obj):
+datalinks = {
+    LINKTYPE_NULL     : ('NULL', None),
+    LINKTYPE_ETHERNET : ('ETHERNET', 'handle_ethernet'),
+    LINKTYPE_RAW      : ('RAW_IP', 'handle_ip'),
+}
+def handle_ethernet (ts, pkt):
     try:
         eth = dpkt.ethernet.Ethernet (pkt)
     except dpkt.dpkt.NeedData:
-        pass
         return
-    # if eth.type == dpkt.ethernet.ETH_TYPE_IP:
-    #     Counter.ip += 1
-    # elif eth.type == dpkt.ethernet.ETH_TYPE_8021Q:
-    #     Counter.vlan += 1
-    # else:
     if eth.type not in ETH_TYPES:
         # Should I use a logger???
-        eprint ('ERR: Error unpacking a packet at %s. Packet is %s type.\nIgnore and continue.'%\
-            (ts, eth.type))
-        return SKIP_PACKET, None
-    return obj.process_ip (ts, eth.data), eth.type
+        # eprint ('handle_ethernet() Unknown packet type %s at timestamp %s. Ignore and continue.'%\
+        #     (eth.type, ts))
+        return SKIP_PACKET, eth.type
+    return (eth.data, eth.type)
+    # return obj.process_ip (ts, eth.data), eth.type
 
 def handle_ip (ts, pkt, obj):
     try:
@@ -74,9 +73,9 @@ def handle_ip (ts, pkt, obj):
     except dpkt.dpkt.UnpackError:
         # Should I use a logger???
         eprint ('ERR: Error unpacking a packet at %s. Packet is %s type.\nIgnore and continue.'%\
-            (ts, type(ip)))
+            (ts, type(pkt)))
         return SKIP_PACKET, None
-    return obj.process_ip (ts, ip), type(dpkt.ip.IP)
+    return (ip, dpkt.ethernet.ETH_TYPE_IP)
 
 class ERR(Exception):
     NONE = 0
@@ -116,6 +115,16 @@ class PacketCounter:
     @property
     def all (self):
         return self._all
+
+    @property
+    def ipv4 (self):
+        return self._IP
+    @property
+    def ipv6 (self):
+        return self._IP6
+    @property
+    def arp (self):
+        return self._ARP
 
     def count (self, typ):
         self._all += 1
@@ -165,7 +174,7 @@ class PacketCounter:
     
     @staticmethod
     def total ():
-        return Counter.ip + Counter.vlan
+        return PacketCounter.ip + PacketCounter.vlan
     
 
 class Parser (object):
@@ -201,38 +210,46 @@ class Parser (object):
         dlink = self.pcap.datalink()
         if dlink not in datalinks:
             eprint ("Datalink type: {:3d} Unknown".format (dlink) )
+            raise
         else:
             eprint ("Datalink type: {:3d} {}".format (dlink, datalinks[dlink][0]))
             self.pkt_handler = globals()[datalinks [dlink][1]]
 
         return
 
-    def process_ip (self, ts, ip):
+    def process_pkt (self, ts, pkt):
         try:
             tsecond = int (ts)
         except ERR:
             eprint ('ERR: Timestamp conversion failure %s'%ts)
-            eprint ('File', self.filename, "Packet# =", self.counter.all)
-            exit ()
-            return 
-            
-        # if type (ip) != dpkt.ip.IP:
-        if not isinstance (ip, dpkt.ip.IP):
-            eprint ('ERR: Unknown IP type: %s'%type(ip), "Packet# =", self.counter.all)
-            # print ("process_ip(): Counts: vlan=%d ip=%d"%(Counter.vlan, Counter.ip))
-            # exit()
-            return SKIP_PACKET
+            eprint ('File', self.filename, "Packet Cnt =", self.counter.all)
+            raise
+        
         if ts < self.last_ts:
             eprint ('ERR: Mismatching time.')
             eprint ('     Packet time: %s'%ts)
             eprint ('     Last time:   %s'%self.last_ts)
+            raise
+        buf, pktype = self.pkt_handler (ts, pkt)
+        self.counter.count (pktype) # this is only for counting packets
+        if isinstance(buf, dpkt.ip.IP):
+            buf = self.process_ip4(ts, buf)
+        elif isinstance(buf, dpkt.ip6.IP6):
+            buf = self.process_ip6(ts, buf)
+        else:
+            buf = SKIP_PACKET
+        return buf
+
+    def process_ip4 (self, ts, ip):
         # print (tsecond, ip)
-        
-        p = ip_packet()
+        p = flow_packet()
         p.ts  = ts
-        p.sip = ipaddress.IPv4Address(ip.src)
-        p.dip = ipaddress.IPv4Address(ip.dst)
+        p.type = "ip4"
+        p.saddr = ipaddress.IPv4Address(ip.src)
+        p.daddr = ipaddress.IPv4Address(ip.dst)
         p.proto = ip.p
+        p.ttl = ip.ttl
+        p.len = ip.len
         # print (type (ip.data))
         if type (ip.data) in {dpkt.tcp.TCP, dpkt.udp.UDP}:
             # print (type (ip), ip.data.sport, ip.data.dport)
@@ -240,13 +257,24 @@ class Parser (object):
             p.dport = ip.data.dport # destination port
         else:
             p.sport, p.dport = 0, 0
-        p.ttl = ip.ttl
-        p.len = ip.len
         return p
     
-    def process_ipv6 (self, ts, ipv6):
-        pass
+    def process_ip6 (self, ts, ip6):
+        p = flow_packet()
+        p.ts  = ts
+        p.type = "ip6"
+        p.saddr = ipaddress.IPv6Address(ip6.src)
+        p.daddr = ipaddress.IPv6Address(ip6.dst)
+        p.proto = ip6.nxt
+        p.len = ip6.plen
 
+        if type (ip6.data) in {dpkt.tcp.TCP, dpkt.udp.UDP}:
+            p.sport = ip6.data.sport # source port
+            p.dport = ip6.data.dport # destination port
+        else:
+            p.sport, p.dport = 0, 0
+        return p
+        
     def getnext (self, type='str'):
         funcname = 'get_%s'%type
         f = getattr(self, funcname)
@@ -274,7 +302,7 @@ class Parser (object):
         if p == None:
             return None
         s = '{},{},{},{},{},{},{},{}'.format\
-            (p.ts, p.sip, p.dip, p.proto, p.sport, p.dport, p.ttl, p.len)
+            (p.ts, p.saddr, p.daddr, p.proto, p.sport, p.dport, p.ttl, p.len)
         return s
 
     def get_json (self, p):
@@ -321,12 +349,12 @@ class Parser (object):
         self.cache_index=0
         self.cache_cnt=0
         for ts, pkt in self.pcap:
-            buf, pktype = self.pkt_handler (ts, pkt, self)
+            buf = self.process_pkt (ts, pkt)
             # print ("_fill_cache", buf.ts)
             if buf == None:
                 break
             elif buf != SKIP_PACKET:
-                self.counter.count (pktype) # this is only for counting packets
+                
                 self.cache[self.cache_cnt] = buf
                 self.cache_cnt += 1
                 if self.cache_cnt == count:
@@ -413,10 +441,12 @@ def parse_arguments (argv):
     return inputfile, outputfile, outformat
 
 if __name__ == "__main__":
+    import sys
+    sys.path.append('./src')
     infile, outfile, outformat = parse_arguments (sys.argv)
 
     if (infile == None):
-        infile = '/home/datasets/caida/ddos-20070804/ddostrace.20070804_134936.pcap'
+        infile = './datasets/cicddos2019/pcap/SAT-01-12-2018_0000.pcap'
 
     if (outformat == None):
         outformat = "str"

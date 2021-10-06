@@ -1,7 +1,7 @@
 import subprocess
 from utilities import eprint
 from utilities import ipStr2Hex
-from datastructures.structures import ip_packet
+from datastructures.structures import flow_packet
 from .dpkt_pcap_parser import Parser
 import pickle
 
@@ -94,7 +94,7 @@ class dpkt_pcap2csv:
         if (line==''):
             return None
         
-        p = ip_packet()
+        p = flow_packet()
         try:
             p.ts    = float (s [self.iTime])
             p.sip   = ipStr2Hex (s [self.iSrcIp])
