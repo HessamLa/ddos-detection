@@ -102,6 +102,8 @@ def make_categoric_ftbl_keys (ftbl, K, mode='log2pktcnt'):
   return keys   
 
 class FlowEntry (AssociativeEntry):
+  """A flow entry in the flow table. Creation of the flow requires a first packet.
+  Subsequent updates to the entry will be additive, by adding to its counting attributes."""
   def __init__ (self, hashCode, p):
     """This function, gets a packet
     hashCode is the signature of the flow. p is an flow_packet pertaining to the flow.
@@ -113,14 +115,15 @@ class FlowEntry (AssociativeEntry):
     self.ts   = p.ts  # time-stamp, records latest modifcation time of this flow entry
     self.ts0  = p.ts  # time-stamp, records previous modification time 
     self.tc   = p.ts  # time created, records time of creating this flow entry. Once set, this variable shall not be modified
-    self.sip  = p.sip
-    self.dip  = p.dip
+    self.saddr  = p.saddr
+    self.daddr  = p.daddr
     self.proto  = p.proto
     self.sport  = p.sport
     self.dport  = p.dport
     self.ttl  = p.ttl
     self.len  = p.len
     
+    # counting attributes
     self.pktCnt = 1     # Total packet count
     self.pktLen = p.len # Total packet length
 
@@ -169,8 +172,8 @@ class FlowEntry (AssociativeEntry):
     print ("dirty:", self.dirty)
     
     print ("is new:", self.new)
-    print ("sip dip proto sport dport:",\
-      self.sip, self.dip, self.proto, self.sport, self.dport)
+    print ("saddr daddr proto sport dport:",\
+      self.saddr, self.daddr, self.proto, self.sport, self.dport)
     print ("pkt_cnt pkt_len:", self.pktCnt, self.pktLen)
 
 
@@ -242,11 +245,11 @@ class FlowTable (AssociativeTable):
 
   def add_packet (self, p):
     """Adds the packet p to the flow table. Returns key of the corresponding entry"""
-    print(p)
-    h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport]))
-    print(h)
-    exit()
-    h = hash (str([p.sip, p.dip, p.proto, p.sport, p.dport])) # Make a hash of packet
+    # print(p)
+    # h = hash (str([p.saddr, p.daddr, p.proto, p.sport, p.dport]))
+    # print(h)
+    # exit()
+    h = hash (str([p.saddr, p.daddr, p.proto, p.sport, p.dport])) # Make a hash of packet
     try:
       self.tbl [h].add (p.ts, 1, p.len)
     except KeyError: # This is a new entry
