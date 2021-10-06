@@ -19,7 +19,7 @@ DS_NAME=test_cicddos2019
 DS_DIR=$DDOS_DIR/datasets/$DS_NAME
 
 PCAP_DIR=${DS_DIR}/pcap
-FTD_DIR=${DS_DIR}/ftd-t5
+FTD_DIR=${DS_DIR}/testftd-t5
 
 OUT_DIR=./testoutput
 
@@ -61,55 +61,55 @@ if [[ $1 = ftdshot ]] ; then
 elif ! [ -z "$1" ] ; then
   T=$1
   echo "t is $T"
-
-  if [ -z "$T" ] ; then
-    times=( 60 30 20 10 5 )
-    # times=( 20 10 5 )
-    echo "Running for times 60, 30, 10 and 5 seconds"
-    sleep 2
-  elif ! [[ $T =~ ^[0-9]+$ ]] ; then
-    echo "ERROR: The passed argument is not a number \"$T\"" >&2; exit 1
-  else
-    times=$T
-  fi
-
-  for T in "${times[@]}"
-  do
-      date
-      echo ""
-      echo "****************************************"
-      echo "      REMAKE $OUT_DIR"
-      OUT_DIR=./testoutput-t${T}
-      rm -rf $OUT_DIR
-      mkdir -p $OUT_DIR
-      echo ""
-      echo "* Make Entropies and Statistics ******"
-      STATDST="${OUT_DIR}/stats.stt"
-      ENTDST="${OUT_DIR}/entropies.ent"
-      mkdir -p logs
-      LOGFILE="logs/testlog-t${T}.tmp"; echo "" > $LOGFILE
-      echo "Logging" >> $LOGFILE
-      echo "Time Win: ${T} seconds" >> $LOGFILE
-      echo "Ent Dest: $ENTDST" >> $LOGFILE
-      echo "Stt Dest: $STATDST" >> $LOGFILE
-
-
-      c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST >> $LOGFILE"
-      # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
-      # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
-      # c="${CODE_DIR}/psim.py -d $PCAP_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
-      # c="${CODE_DIR}/psim.py -f $FTD_DIR -t $T -e $ENTDST"
-      # c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
-      # c="srun -n 1 $c &" # to make sure each job has its own processor, it is best to use srun -n 1
-      echo "* |Time Window             ${T}s"
-      echo "* |NShot Source Dir        $FTD_DIR"
-      echo "* |Entropies Destination   $ENTDST"
-      echo "* |Statistics Destination  $STATDST"
-      echo "* |$c" 
-      echo "*"
-      eval $c
-  done
 fi
+if [ -z "$T" ] ; then
+  times=( 60 30 20 10 5 )
+  # times=( 20 10 5 )
+  echo "Running for times 60, 30, 10 and 5 seconds"
+  sleep 2
+elif ! [[ $T =~ ^[0-9]+$ ]] ; then
+  echo "ERROR: The passed argument is not a number \"$T\"" >&2; exit 1
+else
+  times=$T
+fi
+
+for T in "${times[@]}"
+do
+    date
+    echo ""
+    echo "****************************************"
+    echo "      REMAKE $OUT_DIR"
+    OUT_DIR=./testoutput-t${T}
+    rm -rf $OUT_DIR
+    mkdir -p $OUT_DIR
+    echo ""
+    echo "* Make Entropies and Statistics ******"
+    STATDST="${OUT_DIR}/stats.stt"
+    ENTDST="${OUT_DIR}/entropies.ent"
+    mkdir -p logs
+    LOGFILE="logs/testlog-t${T}.tmp"; echo "" > $LOGFILE
+    echo "Logging" >> $LOGFILE
+    echo "Time Win: ${T} seconds" >> $LOGFILE
+    echo "Ent Dest: $ENTDST" >> $LOGFILE
+    echo "Stt Dest: $STATDST" >> $LOGFILE
+
+
+    c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST >> $LOGFILE"
+    c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
+    # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
+    # c="${CODE_DIR}/psim.py -d $PCAP_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
+    # c="${CODE_DIR}/psim.py -f $FTD_DIR -t $T -e $ENTDST"
+    # c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
+    # c="srun -n 1 $c &" # to make sure each job has its own processor, it is best to use srun -n 1
+    echo "* |Time Window             ${T}s"
+    echo "* |NShot Source Dir        $FTD_DIR"
+    echo "* |Entropies Destination   $ENTDST"
+    echo "* |Statistics Destination  $STATDST"
+    echo "* |$c" 
+    echo "*"
+    eval $c
+done
+
 # TIME=15
 # FTD_DIR=${DS_DIR}/${DS_NAME}/t$TIME
 # mkdir $FTD_DIR

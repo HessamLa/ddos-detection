@@ -7,7 +7,7 @@ class flow_packet():
     """This class is a struct that contains flow-related information of each packet"""
     def __init__ (self):
         self.type    = None # packet type
-        self.tc      = 0 # timestamp of the first packet of the flow
+        # self.tc      = 0 # timestamp of the first packet of the flow
         self.ts      = 0 # timestamp of the this packet of the flow
         self.len     = 0
         self.ttl     = 0

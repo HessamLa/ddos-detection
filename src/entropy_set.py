@@ -72,8 +72,8 @@ class EntropySet: # SHOULD USE A BETTER NAME FOR THIS CLASS
             for f in flows.values():
                 pkt_cnt = f.pkt_cnt
                 pkt_len = f.pkt_len
-                agg_table[self.SIP].   add ( f.sip,   f.ts, pkt_cnt, pkt_len)
-                agg_table[self.DIP].   add ( f.dip,   f.ts, pkt_cnt, pkt_len)
+                agg_table[self.SIP].   add ( f.saddr,   f.ts, pkt_cnt, pkt_len)
+                agg_table[self.DIP].   add ( f.daddr,   f.ts, pkt_cnt, pkt_len)
                 agg_table[self.SP].    add ( f.sport, f.ts, pkt_cnt, pkt_len)
                 agg_table[self.DP].    add ( f.dport, f.ts, pkt_cnt, pkt_len)
                 agg_table[self.PROTO]. add ( f.proto, f.ts, pkt_cnt, pkt_len)
@@ -87,8 +87,8 @@ class EntropySet: # SHOULD USE A BETTER NAME FOR THIS CLASS
         def add_entropy_entry (agg_table, f):
             dif_cnt = f.dif_cnt
             dif_len = f.dif_len
-            agg_table[self.SIP].   add ( f.sip,   f.ts, dif_cnt, dif_len)
-            agg_table[self.DIP].   add ( f.dip,   f.ts, dif_cnt, dif_len)
+            agg_table[self.SIP].   add ( f.saddr,   f.ts, dif_cnt, dif_len)
+            agg_table[self.DIP].   add ( f.daddr,   f.ts, dif_cnt, dif_len)
             agg_table[self.SP].    add ( f.sport, f.ts, dif_cnt, dif_len)
             agg_table[self.DP].    add ( f.dport, f.ts, dif_cnt, dif_len)
             agg_table[self.PROTO]. add ( f.proto, f.ts, dif_cnt, dif_len)
@@ -107,8 +107,8 @@ class EntropySet: # SHOULD USE A BETTER NAME FOR THIS CLASS
             # dif_cnt = f.dif_cnt
             # dif_len = f.dif_len
             # ts = f.ts
-            # agg_table[self.SIP].   add ( f.sip,   ts, dif_cnt, dif_len)
-            # agg_table[self.DIP].   add ( f.dip,   ts, dif_cnt, dif_len)
+            # agg_table[self.SIP].   add ( f.saddr,   ts, dif_cnt, dif_len)
+            # agg_table[self.DIP].   add ( f.daddr,   ts, dif_cnt, dif_len)
             # agg_table[self.SP].    add ( f.sport, ts, dif_cnt, dif_len)
             # agg_table[self.DP].    add ( f.dport, ts, dif_cnt, dif_len)
             # agg_table[self.PROTO]. add ( f.proto, ts, dif_cnt, dif_len)
