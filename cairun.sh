@@ -8,7 +8,7 @@
 #SBATCH --time=8:00:00
 #SBATCH --ntasks-per-node=5
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=80G
+#SBATCH --mem=160G
 
 DDOS_DIR=~/ddos-detection
 CODE_DIR=${DDOS_DIR}/src
@@ -27,13 +27,13 @@ OUT_DIR=${DS_DIR}/output
 if [[ $1 = ftdshot ]] ; then
   date
   echo "****************************************"
-  echo "* Making NetShots **********************"
+  echo "* Making FTD Shots **********************"
   TIME=5
   FTD_DIR=${DS_DIR}/ftd-t${TIME}
   mkdir -p $FTD_DIR
-  echo "* PCAP Source Dir:       $PCAP_DIR"
-  echo "* NShot Destination Dir: $FTD_DIR"
-  echo "* Time Resolution:       ${TIME}s"
+  echo "* PCAP Source Dir:     $PCAP_DIR"
+  echo "* FTD Destination Dir: $FTD_DIR"
+  echo "* Time Resolution:     ${TIME}s"
   # echo "* Pipe:                  $PIPE"
   # PIPE=${PCAP_DIR}/p.pcap
   # c="sudo mkfifo $PIPE"
@@ -46,8 +46,8 @@ if [[ $1 = ftdshot ]] ; then
   # echo "sudo mkdir $FTD_DIR"
   # sudo mkdir $FTD_DIR
 
-  c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-nshots.tmp"
-  # c="srun $c"  # this line is added for slurm job manager
+  c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-ftdshots-t${TIME}.tmp"
+  c="srun -n 1 $c"  # this line is added for slurm job manager
   echo $c;
   eval $c
 
@@ -90,13 +90,14 @@ do
     echo "Stt Dest: $STATDST" >> $LOGFILE
 
 
-    c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST >> $LOGFILE"
+    c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST -i"
     # c="${CODE_DIR}/psim.py -d $PCAP_DIR -o $OUT_DIR -t $T -e $ENTDST -s $STATDST"
     # c="${CODE_DIR}/psim.py -f $FTD_DIR -t $T -e $ENTDST"
-    # c="srun -o logs/log${T}_%j.txt $c &"  # this line is added for slurm job manager
-    c="srun -n 1 $c &" # to make sure each job has its own processor, it is best to use srun -n 1
+    c="$c >> $LOGFILE"  # send the output to logfile
+    c="srun -n 1 $c"    # to make sure each job has its own processor, it is best to use srun -n 1
+    c="$c &"            # Finally send the program to background
     echo "* |Time Window             ${T}s"
     echo "* |NShot Source Dir        $FTD_DIR"
     echo "* |Entropies Destination   $ENTDST"

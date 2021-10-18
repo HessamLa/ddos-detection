@@ -44,6 +44,11 @@ class Simulator:
     self.timewin = float(timewin) # SImulation time window in seconds. In each window, the packets will be analyzed
 
     files = [f for f in os.listdir (idir) if f.endswith (filetype) and f.find (filterstr) != -1 ]    
+    files.sort()
+    print("TAKE ONLY THE FIRST 10 FILES TO SPEED UP")
+    print("********** FIX THIS LATER ************")
+    files = files[:4]
+    files = [files[0]]
     self.protocols = protocol
     self.show_image = show_image
     # self.ent_name = ent_name # name of the entropy to be saved as .dmp file
@@ -74,6 +79,16 @@ class Simulator:
       self.switches[sd].time = basetime
     self.basetime = basetime
     # self.time = basetime
+  
+  def savePickle (self, data, attr, filepath, mode="w+b"):
+    if (not hasattr(self, attr)):
+      print(f"Save pickel {attr} to {filepath}")
+      pw = util.pickle_write (filepath, mode=mode)
+      setattr(self, attr, pw)
+    pw = getattr (self, attr)
+    pw.dump (data)
+    return
+
 
   def run(self):
     it = 0
@@ -109,107 +124,106 @@ class Simulator:
         for d in self.switches:
           self.controller.add_ftable (self.switches[d].switch.flow_table.clone ("dirty"))
       ftbl_all = self.controller.ftbl_all
-      # ftbl_all = self.controller.get_ftbl_all ()
+      # Now we have this table. The next step would be to process it.
+      # Save the controller flowtable to be processed offline
+      # no more entropy calculation with psim.py
+      # and skip the rest
+      filepath=f"{P.outdir}/controller-ftd-t{STime.timewin}/ftbl_t{STime.timewin}.pkl"
+      self.savePickle(ftbl_all, filepath, f"controller_ftbl_t{STime.timewin}")
+      
       t3 = time.time()
 
-      # categorize ftbl_all
-      cat_method = "log2pktlen"
-      cat_method = "log10pktlen"
-      categories = [1, 10, 100, 1000, 10000]
-      K = 6
-      # cat_method = "log2pktcnt"
-      # K = 13 # 0, 1, 2-3, 4-7, 8-15, 16-31, ..., 1024+
+      # # categorize ftbl_all
+      # cat_method = "log2pktlen"
+      # cat_method = "log10pktlen"
+      # categories = [1, 10, 100, 1000, 10000]
+      # K = 6
+      # # cat_method = "log2pktcnt"
+      # # K = 13 # 0, 1, 2-3, 4-7, 8-15, 16-31, ..., 1024+
       
-      cat_method = "log10pktcnt"
-      categories = None
-      K = 5 # 1, 2-10, 11-100, 101-1000, 1001+ 
-      # # cat_method = "exppktcnt"
+      # cat_method = "log10pktcnt"
+      # categories = None
+      # K = 5 # 1, 2-10, 11-100, 101-1000, 1001+ 
+      # # # cat_method = "exppktcnt"
 
-      print ("Make categorical ftables", cat_method, K, categories)
-      cftbls = make_categoric_ftables (ftbl_all, cat_method, K=K, categories=categories)
-      t_ftbl_cat = time.time () - t3
-      for ftbl in cftbls:
-        # print (ftbl.id, ftbl.name, STime.nowtime)
-        dumpname=P.datasetname + '-t'+str(int (STime.timewin))+'-' + ftbl.name
-        dumppath=P.outdir +'/'+ dumpname + '.ent'
-        eset = EntropySet (ftbl=ftbl)
-        eset.dumpEntropies (dumppath, mode='ab')
-      
-      t_entset = time.time ()-t3
-
-      
-      t0 = time.time ()
-      # keys = make_categoric_ftbl_keys (ftbl_all, K=13)
-      t_ftbl_keys = time.time () - t0
-
-      # for name in keys:
-      #   dumpname=P.datasetname + '-t'+str(int (STime.timewin))+'-' + name
+      # print ("Make categorical ftables", cat_method, K, categories)
+      # cftbls = make_categoric_ftables (ftbl_all, cat_method, K=K, categories=categories)
+      # t_ftbl_cat = time.time () - t3
+      # for ftbl in cftbls:
+      #   # print (ftbl.id, ftbl.name, STime.nowtime)
+      #   dumpname=P.datasetname + '-t'+str(int (STime.timewin))+'-' + ftbl.name
       #   dumppath=P.outdir +'/'+ dumpname + '.ent'
-      #   eset = EntropySet (ftbl=ftbl_all, entrykeys=keys[name])
+      #   eset = EntropySet (ftbl=ftbl)
       #   eset.dumpEntropies (dumppath, mode='ab')
-
-      t_entset_keys = time.time () - t0
-
-      # # draw the histogram
-      # from histogram import get_ftbl_histogram
-      # get_ftbl_histogram (ftbl_all, feat='avg_len')
-
-      # self.entset.reinit () # remove all data in this table
-      # self.entset.update (data=data)
-
-      t4 = time.time()
-      # self.entset.update (ftbl=ftbl_all)
-      self.entset = EntropySet (ftbl=ftbl_all)
-
-      self.entset.printInfo ()
-
-      t5 = time.time()
-      t_getEntropies = t5-t4
-      # entropies = dict()
-      # # include time
-      # for id in ents.keys():
-      #   id, name, e = ents [id]
-      #   entropies [id] = (id, name, e, STime.nowtime, STime.timewin)
-
-      self.entset.dumpEntropies (filename=P.entropypath, mode='ab')
-      entropies = self.entset.getEntropies ()
-
-      # convert to json
-      import json
-      jobj = json.dumps({'sim_info':{'nowtime':STime.nowtime, 'timewin':STime.timewin}, 'entropies':entropies})
-      entropies = None
-      obj=json.loads (jobj)
-      print (obj['sim_info']['nowtime'], obj['sim_info']['timewin'])
-      entropies = obj['entropies']
-
-      if (self.show_image == True):
-        self.entropyDiagram.make (entropies, motion=True)
-        self.entropyDiagram.show (pause=0.01)
       
-      def savePickle (data, attr, filename, outdir=None):
-        if (not hasattr(self, attr)):
-          pw = util.pickle_write (filename, mode='w+b')
-          setattr(self, attr, pw)
-        pw = getattr (self, attr)
-        pw.dump (data)
-        return
+      # t_entset = time.time ()-t3
 
-      print (C.CYN,
-      'psim.run: tProgress=%.2f ftbl_all=%.2f\n'%(t2-t1, t3-t2),
-      '     entset=%.2f  ftbl_cat=%.2f\n'%(t_entset, t_ftbl_cat),
-      'entset_keys=%.2f ftbl_keys=%.2f\n'%(t_entset_keys, t_ftbl_keys),
-      'getEntropies=%.2f'%(t_getEntropies),C.NC)
+      
+      # t0 = time.time ()
+      # # keys = make_categoric_ftbl_keys (ftbl_all, K=13)
+      # t_ftbl_keys = time.time () - t0
+
+      # # for name in keys:
+      # #   dumpname=P.datasetname + '-t'+str(int (STime.timewin))+'-' + name
+      # #   dumppath=P.outdir +'/'+ dumpname + '.ent'
+      # #   eset = EntropySet (ftbl=ftbl_all, entrykeys=keys[name])
+      # #   eset.dumpEntropies (dumppath, mode='ab')
+
+      # t_entset_keys = time.time () - t0
+
+      # # # draw the histogram
+      # # from histogram import get_ftbl_histogram
+      # # get_ftbl_histogram (ftbl_all, feat='avg_len')
+
+      # # self.entset.reinit () # remove all data in this table
+      # # self.entset.update (data=data)
+
+      # t4 = time.time()
+      # # self.entset.update (ftbl=ftbl_all)
+      # self.entset = EntropySet (ftbl=ftbl_all)
+
+      # self.entset.printInfo ()
+
+      # t5 = time.time()
+      # t_getEntropies = t5-t4
+      # # entropies = dict()
+      # # # include time
+      # # for id in ents.keys():
+      # #   id, name, e = ents [id]
+      # #   entropies [id] = (id, name, e, STime.nowtime, STime.timewin)
+
+      # self.entset.dumpEntropies (filename=P.entropypath, mode='ab')
+      # entropies = self.entset.getEntropies ()
+
+      # # convert to json
+      # import json
+      # jobj = json.dumps({'sim_info':{'nowtime':STime.nowtime, 'timewin':STime.timewin}, 'entropies':entropies})
+      # entropies = None
+      # obj=json.loads (jobj)
+      # print (obj['sim_info']['nowtime'], obj['sim_info']['timewin'])
+      # entropies = obj['entropies']
+
+      # if (self.show_image == True):
+      #   self.entropyDiagram.make (entropies, motion=True)
+      #   self.entropyDiagram.show (pause=0.01)
+      
+
+      # print (C.CYN,
+      # 'psim.run: tProgress=%.2f ftbl_all=%.2f\n'%(t2-t1, t3-t2),
+      # '     entset=%.2f  ftbl_cat=%.2f\n'%(t_entset, t_ftbl_cat),
+      # 'entset_keys=%.2f ftbl_keys=%.2f\n'%(t_entset_keys, t_ftbl_keys),
+      # 'getEntropies=%.2f'%(t_getEntropies),C.NC)
 
       # save entropies to file
       # savePickle (entropies, attr='entr', filename=P.entropypath)
       
-      # save flow table stats to files
-      for d in self.switches:
-        ftbl = self.switches[d].switch.flow_table
-        s = StatsFtbl.stats (ftbl, K=10)
-        # StatsFtbl.print (s)
-        savePickle (s, attr='stat', filename=P.statspath)
-        # savePickle (s, attr='stat', filename='stat_log2'+self.switches[d].switch.name+'_t'+str(self.timewin)+'.dmp')
+      # # save flow table stats to files
+      # for d in self.switches:
+      #   ftbl = self.switches[d].switch.flow_table
+      #   s = StatsFtbl.stats (ftbl, K=10)
+      #   # StatsFtbl.print (s)
+      #   self.savePickle (s, attr='stat', filename=P.statspath, mode="a")
+      #   # savePickle (s, attr='stat', filename='stat_log2'+self.switches[d].switch.name+'_t'+str(self.timewin)+'.dmp')
 
       # if all switches are done getting new packets, then 
       alldone = True

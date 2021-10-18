@@ -69,7 +69,7 @@ class pickle_write:
         except:
             eprint ("ERR: Failed to open/create the file", self.filepath)
             eprint ("pickle_write.__init__()")
-            exit ()
+            raise
         return
     
     def dump (self, obj):
@@ -78,7 +78,7 @@ class pickle_write:
         except:
             eprint ("ERR: Problem dumping the pickle to", self.filepath)
             eprint ("pickle_write.dump()")
-            exit ()
+            raise
         return
     
     def close_file (self):

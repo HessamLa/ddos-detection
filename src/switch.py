@@ -262,51 +262,30 @@ class Switch_Driver:
     elif (timewin):
       self.timewin = float(timewin)
 
-    t1 = time.time ()
-    st = 0
     self.switch.reinit()
     if (self.filetype == 'pcap'):
       for packets in self.__read_pcaps(self.time + self.timewin):
-        t2 = time.time()
         self.switch.send_packets (packets=packets)
-        t3 = time.time()
-        st += t3-t2
         # eprint ('{} @{:.2f}   from {} to {}'. format (self.filename, t, self.next_pkt_id, i))
         self.next_pkt_id += len (packets)
-      self.time += self.timewin
-      print ('switch.progress(): switch.send_packets() time={}{:.2f}{}, total time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1, C.NC))
+    
+      # print ('switch.progress(): switch.send_packets() time={}{:.2f}{}, total time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1, C.NC))
+    
     elif (self.filetype == 'ftd'):
       for ftbl in self._read_ftable (self.time + self.timewin):
-        t2 = time.time()
         self.switch.flow_table.add_table (ftbl)
-        st += time.time()-t2
-      t3 = time.time()
-      print ('switch.progress(): switch.flow_table.add_table() time={}{:.2f}{}, ReadFtbl time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1-st, C.NC))
+      # print ('switch.progress(): switch.flow_table.add_table() time={}{:.2f}{}, ReadFtbl time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1-st, C.NC))
+    report=f"switchID:{self.switch.id:03d}, "
+    report+=f"NewEntries:{len(self.switch.flow_table.newKeys):5d}, "
+    report+=f"DirtyEntries:{len(self.switch.flow_table.dirtyKeys):5d}, "
+    print(report)
 
-    #   if (not hasattr(self, 'nshot')):
-    #     self.nshot = self._read_ftable (self.time + self.timewin)
-    #     self.dumptype, self.protocols, self.nswin, self.nstime, self.nsftbl = FTDObj.unpack_obj (self.nshot)
-    #     # nstime: netshot switch time
-    #     # nswin: netshot time window
-    #     print (C.RED, timelim, self.time, self.timewin, C.NC)
-    #     if (self.time < self.nstime):
-    #         self.time = self.nstime
-    #   timelim = self.time + self.timewin
-
-    #   while (self.nstime + self.nswin < timelim):
-    #     print (C.RED, self.nstime, self.nswin, timelim, C.NC)
-    #     if (self.dumptype==FTDObj.DumpType.NEW_FLOWTABLE): # update the flowtable if there is a change.
-    #       self.switch.flow_table.add_table (self.nsftbl)
-    #     self.dumptype, self.protocols, self.nswin, self.nstime, self.nsftbl = self._read_ftable ()
-
-      self.time += self.timewin
-      
+    # progress the time
+    self.time += self.timewin
     self.switch.update_properties (time = self.time)
 
-    s1 = self.switch.flow_table.size
+    # remove timed out flows
     self.switch.maintain_flowtable (idle_timeout=self.idle_timeout)
-    s2 = self.switch.flow_table.size
-    print (">>>switch.progress(): "+str(s1)+" - "+str(s2)+" = \033[0;31m"+str(s1-s2)+"\033[0m<<<<<")
     return
 
   def __read_pcaps (self, timelim):
