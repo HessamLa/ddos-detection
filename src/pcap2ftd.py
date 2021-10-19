@@ -2,6 +2,7 @@
 
 import getopt
 import time
+from typing import Protocol
 import numpy as np
 import os
 import sys
@@ -22,25 +23,23 @@ import switch
 
 sys.path.append(".")
 
-class FTDshot:
+class PCAP2FTD:
     """This class is used to generate partial flow-table data (ftd) files from PCAP files.
     The class works by taking all packets within a time window and crate the flow-table
     containing the partial flows in that time window, thus taking a shot of flows in a
     time window.
     """
-    def __init__ (self, pcapdir='.', ftddir='.', timewin=60.0, filterstr='', protocol=''): # protocol is a comma-separted list
+    def __init__ (self, pcapfilepath='.', ftdfilepath='.', timewin=5.0, protocol=''): # protocol is a comma-separted list
         self.timewin = float(timewin) # SImulation time window in seconds. In each window, the packets will be analyzed
-        self.protocols = protocol
         
-        self.filepaths = [f for f in os.listdir (pcapdir) if f.endswith ('pcap') and f.find (filterstr) != -1 ]        
-        self.filepaths.sort()
         self.switches = dict ()
-        self.netshots = dict ()
+        self.ftdshot_writer = dict ()
 
         if (not os.path.exists(ftddir)):
             os.makedirs(ftddir)
             
         times=[]
+        self.filepaths=[pcapfilepath]
         for f in self.filepaths: # FOREACH switch PCAP file, read the file and create corresponding objects
             # Create a switch object
             sd = switch.Switch_Driver (f, 'pcap', pcapdir, self.timewin, protocol)
@@ -49,10 +48,9 @@ class FTDshot:
 
             # Create dumper object for each switch
             # fd = pickle_write (os.path.splitext (f)[0]+'.ftd', outdir=ftddir)
-            filename = ftddir+'/'+os.path.splitext (f)[0]+'.ftd'
-            print("** TEST ftd output:", filename)
-            fd = pickle_write (filename, mode='w+b')
-            self.netshots [f] = fd
+            # filename = ftddir+'/'+os.path.splitext (f)[0]+'.ftd'
+            print("** TEST ftd output:", ftdfilepath)
+            self.ftdshot_writer [f] = pickle_write (ftdfilepath, mode='w+b')
             print ("")
         # readjust time of all switches to the earliest one
         basetime = int (min (times)/timewin)*timewin
@@ -88,11 +86,11 @@ class FTDshot:
                 #     tmp[k] = ftbl[k].copy()
                 # obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, tmp)
                 obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, ftbl)
-                self.netshots [d].dump (obj)
+                self.ftdshot_writer [d].dump (obj)
                 #~Test ****************************************
-                # path=self.netshots [d].filepath
-                # for d in self.netshots:
-                #     self.netshots [d].close_file()
+                # path=self.ftdshot_writer [d].filepath
+                # for d in self.ftdshot_writer:
+                #     self.ftdshot_writer [d].close_file()
                 # # path="/N/u/hessamla/Carbonate/ddos-detection/datasets/cicddos2019/ftd-t5/SAT-01-12-2018_0000.ftd"
                 # print(path)
                 # print(ftbl)
@@ -119,8 +117,8 @@ class FTDshot:
             sys.stdout.flush()
             # END WHILE ##########################################
 
-        for d in self.netshots:
-            self.netshots [d].close_file()
+        for d in self.ftdshot_writer:
+            self.ftdshot_writer [d].close_file()
 
 def parse_arguments (argv):
     # pcapdir = "/home/datasets/caida/ddos-20070804"
@@ -175,11 +173,21 @@ if __name__ == "__main__":
     # eprint ("Press anykey to coninue...")
     # input()
 
-    capture = FTDshot (pcapdir=pcapdir,\
-                     ftddir=ftddir,\
-                     timewin=timewin,\
-                     protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP}\
-        )
-    capture.run()
+    try:
+        os.makedirs(ftddir)
+    except:
+        pass
 
-        
+    timewin=5.0
+    protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP}
+    for filepath in os.listdir(pcapdir):
+        if (not filepath.endswith(".pcap")):
+            continue
+        pcappath=f"{pcapdir}/{filepath}"
+        ftdpath=f"{ftddir}/{filepath[:-5]}.ftd"
+        convert = PCAP2FTD (pcapfilepath=pcappath,
+                        ftdfilepath=ftdpath,
+                        timewin=timewin,
+                        protocol=protocol)
+        convert.run()
+

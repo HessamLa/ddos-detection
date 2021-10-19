@@ -178,7 +178,7 @@ class PacketCounter:
     
 
 class Parser (object):
-    def __init__ (self, filename):
+    def __init__ (self, filename, buffersize=100000):
         self.x = 10
         self.last_ts = 0
         self.filename = filename
@@ -186,8 +186,8 @@ class Parser (object):
         self.pkt_handler = None
 
         # This cache works as a queue
-        self.cache_depth = 100000
-        self.cache = [None for i in range (self.cache_depth)]
+        self.cache_size = buffersize
+        self.cache = [None for i in range (self.cache_size)]
         self.cache_index = 0
         self.cache_cnt = 0
         
@@ -218,6 +218,8 @@ class Parser (object):
         return
 
     def process_pkt (self, ts, pkt):
+        """After processing the pkt (ipv4 or ipv6), returns a flow_packet, or
+        retuns SKIP_PACKET if the pkt type is unknown."""
         try:
             tsecond = int (ts)
         except ERR:
@@ -339,13 +341,13 @@ class Parser (object):
             # print ("getnext_pkt", p)
         except StopIteration:
             p=None
-            pass
+            # raise None
         return p
 
     def _fill_cache (self, count=0):
         """This method is used to speed up reading the pcap file"""
         if count==0:
-            count=self.cache_depth
+            count=self.cache_size
         self.cache_index=0
         self.cache_cnt=0
         for ts, pkt in self.pcap:
@@ -353,14 +355,13 @@ class Parser (object):
             # print ("_fill_cache", buf.ts)
             if buf == None:
                 break
-            elif buf != SKIP_PACKET:
-                
+            elif buf == SKIP_PACKET:
+                continue
+            else:
                 self.cache[self.cache_cnt] = buf
                 self.cache_cnt += 1
                 if self.cache_cnt == count:
                     break
-            else: # if buf == SKIP_PACKET:
-                continue
 
             # if (buf):
             #     self.cache[self.cache_cnt] = buf

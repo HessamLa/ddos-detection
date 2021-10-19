@@ -19,14 +19,14 @@ DS_NAME=test_cicddos2019
 DS_DIR=$DDOS_DIR/datasets/$DS_NAME
 
 PCAP_DIR=${DS_DIR}/pcap
-FTD_DIR=${DS_DIR}/testftd-t5
+FTD_DIR=${DS_DIR}/ftd-t5
 
 OUT_DIR=./testoutput
 
 echo "**********_T_E_S_T____R_U_N_***********"
 echo "********  Dataset $DS_NAME  ***********"
 
-if [[ $1 = ftdshot ]] ; then
+if [[ $1 = pcap2ftd ]] ; then
   date
   # echo "***** SKIP FTD ******"
   # echo "****************************************"
@@ -49,12 +49,12 @@ if [[ $1 = ftdshot ]] ; then
   # echo "sudo mkdir $FTD_DIR"
   # sudo mkdir $FTD_DIR
 
-  c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-nshots.tmp"
-  c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME"
+  c="${CODE_DIR}/pcap2ftd.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-nshots.tmp"
+  # c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME"
   # c="srun $c"  # this line is added for slurm job manager
   echo $c;
   eval $c
-
+  exit
   # echo "sudo rm $PIPE"
   # sudo rm $PIPE
 

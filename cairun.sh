@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH -J caida_t10
-#SBATCH -p general
+#SBATCH -p gpu
 #SBATCH -o log_%j.txt
 #SBATCH -e log_%j.err
 #SBATCH --nodes=1
@@ -16,6 +16,7 @@ CODE_DIR=${DDOS_DIR}/src
 DS_NAME=maccdc2012
 DS_NAME=caida
 DS_NAME=cicddos2019
+DS_NAME=test_cicddos2019
 
 DS_DIR=$DDOS_DIR/datasets/$DS_NAME
 
@@ -24,7 +25,7 @@ FTD_DIR=${DS_DIR}/ftd-t5
 
 OUT_DIR=${DS_DIR}/output
 
-if [[ $1 = ftdshot ]] ; then
+if [[ $1 = pcap2ftd ]] ; then
   date
   echo "****************************************"
   echo "* Making FTD Shots **********************"
@@ -46,8 +47,8 @@ if [[ $1 = ftdshot ]] ; then
   # echo "sudo mkdir $FTD_DIR"
   # sudo mkdir $FTD_DIR
 
-  c="${CODE_DIR}/ftdshot.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-ftdshots-t${TIME}.tmp"
-  c="srun -n 1 $c"  # this line is added for slurm job manager
+  c="${CODE_DIR}/pcap2ftd.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-ftdshots-t${TIME}.tmp"
+  # c="srun -n 1 $c"  # this line is added for slurm job manager
   echo $c;
   eval $c
 
