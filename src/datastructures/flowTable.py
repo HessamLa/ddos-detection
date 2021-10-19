@@ -187,6 +187,25 @@ class FlowTable (AssociativeTable):
     self.__new_keys = set () # Keys of the new entries. This set is a subset of self.__dirty_keys
     return
 
+  def get_summary(self, oneliner=True) -> str:
+    if(oneliner):
+      r=f"{self.name} cnt:{self.__totalpktCnt} len:{self.__totalpktLen} "
+      r+="all:{len(self.tbl)} new:{len(self.__new_keys)} dirty:{len(self.__dirty_keys)}"  
+    else:
+      r =f"Name:{self.name}\n"
+      r+=f"Packet count: {self.__totalpktCnt}\n"
+      r+=f"Packet length: {self.__totalpktLen}\n"
+      r+=f"Total entries: {len(self.tbl)}\n"
+      r+=f"Dirty entries: {len(self.__dirty_keys)}\n"
+      r+=f"New entries: {len(self.__new_keys)}\n"
+    return r
+
+  def summary(self) -> None:
+    print(self.get_summary(oneliner=False))
+
+  def __repr__(self) -> str:
+    return self.get_summary()
+  
   def __populate_keys_sets (self):
     if (len (self.__new_keys) == 0): # IF new_keys is empty, THEN populate it
       if (len (self.__dirty_keys) == 0): # IF dirty_keys is empty, THEN populate it too
