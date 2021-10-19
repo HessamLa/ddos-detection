@@ -6,16 +6,33 @@ from utilities import eprint
 class flow_packet():
     """This class is a struct that contains flow-related information of each packet"""
     def __init__ (self):
-        self.type    = None # packet type
-        # self.tc      = 0 # timestamp of the first packet of the flow
-        self.ts      = 0 # timestamp of the this packet of the flow
-        self.len     = 0
-        self.ttl     = 0
-        self.srcaddr = 0x00000000 # source address
-        self.dstaddr = 0x00000000 # destination address
-        self.proto   = 0          # transport layer protocol
-        self.srcprt  = 0          # source port number
-        self.dstprt  = 0          # destination port number
+        pass
+        # all the following attributes are to be set after creating the object
+        # self.type    = None # packet type
+        # self.tc     = 0 # timestamp of the first packet of the flow
+        # self.ts     = 0 # timestamp of the this packet of the flow
+        # self.len    = 0 # packet length
+        # self.saddr  = 0x00000000  # source address
+        # self.daddr  = 0x00000000  # destination address
+        # self.proto  = 0           # transport layer protocol
+        # self.sport  = 0           # source port number
+        # self.dport  = 0           # destination port number
+
+    def __repr__(self) -> str:
+        r = f"{self.ts} {self.type} {self.saddr}:{self.sport}->{self.daddr}:{self.dport}"
+        return r
+class flow_packet_of(flow_packet):
+    """OpenFlow child from the flow_packets"""
+    def __init__(self):
+        super().__init__()
+        pass
+        # all the following attributes are to be set after creating the object
+        # self.iport          Ingress port
+        # self.oport          Outgress port
+    def __repr__(self) -> str:
+        r = super().__repr__()
+        r+=f" ({self.iport},{self.oport})"
+        return r
 
 class AssociativeEntry:
     def __init__ (self, key=None, dirty=None, age=0, ts=None):
