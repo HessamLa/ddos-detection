@@ -273,7 +273,7 @@ class Switch_Driver:
     
     elif (self.filetype == 'ftd'):
       for ftbl in self._read_ftable (self.time + self.timewin):
-        self.switch.flow_table.add_table (ftbl)
+        self.switch.flow_table.merge (ftbl)
       # print ('switch.progress(): switch.flow_table.add_table() time={}{:.2f}{}, ReadFtbl time={}{:.2f}{}'.format(C.YLW, st, C.NC, C.YLW, t3-t1-st, C.NC))
     report=f"switchID:{self.switch.id:03d}, "
     report+=f"NewEntries:{len(self.switch.flow_table.newKeys):5d}, "
