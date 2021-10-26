@@ -108,7 +108,6 @@ class FlowEntry (AssociativeEntry):
     """This function, gets a packet
     hashCode is the signature of the flow. p is an flow_packet pertaining to the flow.
     """
-
     AssociativeEntry.__init__ (self, key=hashCode, dirty=True)
     self.new   = True # New Flow flag. True, if this is a new flow entry
 
@@ -130,6 +129,22 @@ class FlowEntry (AssociativeEntry):
 
     self.req_freq    = None # Request frequency
     self.req_phase_shift = None # Request phase shift
+
+  # @NOTE: The following two methods must be modified together, since they reflect on the same data
+  def to_dict(self):
+    """Returns the entry data as dict. The dictionary keys can also be used as columns for converting flowentries data to DataFrame"""
+    D={"ts_latest":self.ts, "ts_previous":self.ts0, "ts_created":self.tc,
+      "saddr":self.saddr, "daddr":self.daddr, "proto":self.proto, "sport":self.sport, "dport":self.dport,
+      "pktcnt":self.pktCnt, "pktlen":self.pktLen}
+    return D
+  
+  def to_list(self):
+    """Retunrs the entry data as list"""
+    L = [self.ts, self.ts0, self.tc]
+    L+= [self.saddr, self.daddr, self.proto, self.sport, self.dport]
+    L+= [self.pktCnt, self.pktLen]
+    return L
+
 
   def reset (self):
     self.dirty = False
