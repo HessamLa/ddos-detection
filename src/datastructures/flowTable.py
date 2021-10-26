@@ -120,8 +120,6 @@ class FlowEntry (AssociativeEntry):
     self.proto  = p.proto
     self.sport  = p.sport
     self.dport  = p.dport
-    self.ttl  = p.ttl
-    self.len  = p.len
     
     # counting attributes
     self.pktCnt = 1     # Total packet count
@@ -132,7 +130,7 @@ class FlowEntry (AssociativeEntry):
 
     self.req_freq    = None # Request frequency
     self.req_phase_shift = None # Request phase shift
-  
+
   def reset (self):
     self.dirty = False
     self.new   = False
@@ -190,7 +188,7 @@ class FlowTable (AssociativeTable):
   def get_summary(self, oneliner=True) -> str:
     if(oneliner):
       r=f"{self.name} cnt:{self.__totalpktCnt} len:{self.__totalpktLen} "
-      r+="all:{len(self.tbl)} new:{len(self.__new_keys)} dirty:{len(self.__dirty_keys)}"  
+      r+=f"all:{len(self.tbl)} new:{len(self.__new_keys)} dirty:{len(self.__dirty_keys)}"  
     else:
       r =f"Name:{self.name}\n"
       r+=f"Packet count: {self.__totalpktCnt}\n"
