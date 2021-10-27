@@ -1,5 +1,6 @@
 # %%
 import os, sys
+from abc import ABCMeta, ABC, abstractmethod
 from pickle import NONE
 from queue import Empty, Full, Queue
 from typing import Generator
@@ -14,13 +15,19 @@ from pcapreader.pcapstream import dpkt_pcap2obj
 from pcapreader.dpkt_pcap_parser import Parser
 
 # base class
-class Streamer:
+class Streamer (ABC):
   def __init__(self) -> None:
     pass
 
+  @abstractmethod
   def source_generator(self) -> Generator:
     """source_generator() is to be defined in the derived class"""
     pass 
+
+  @abstractmethod
+  def summary(self) -> None:
+    pass
+
 
   def __iter__(self):
     for obj in self.source_generator():
@@ -29,21 +36,26 @@ class Streamer:
   @classmethod
   def Make(cls, source, source_type, source_format, **kwargs):
     if(source_format=="pcap"):
-      return PcapStreamer(source, source_type, **kwargs)
+      return FlowPacketStreamer(source, source_type, **kwargs)
     elif(source_format=="ftd"):
-      return FtdStreamer(source, source_type, **kwargs)
+      return FtdObjStreamer(source, source_type, **kwargs)
 
 
 class PcapStreamer (Streamer):
-  def __init__(self, source, source_type, buffersize=100000, dontsort=False, pathfilter=None) -> None:
-    """pathfilter can be a function or lamda function"""
+  def __init__(self) -> None:
+      super().__init__()
+    
+class FlowPacketStreamer (Streamer):
+  def __init__(self, source, source_type, buffersize=100000, dontsort=False, filenamefilter=None) -> None:
+    """filenamefilter is a function or lamda function for pattern matchin the filename in a directory"""
     # super().__init__(source, buffersize=buffersize)
-    if(not pathfilter):
-      pathfilter=lambda x: x.endswith(".pcap")
+    if(not filenamefilter):
+      filenamefilter=lambda x: x.endswith(".pcap")
 
-    self._streamer=None
-    self._streamer_index=0
-
+    self._bufsize = buffersize
+    self._streamer=None         # _streamer will be connected to one PCAP file and stream from that
+    self._nxt_streamer_index=0  # each index corresponds to one file
+    # initialize paths
     self.files = []
     if(source_type=="file" or source_type=="files"):
       if(isinstance(source, str)):
@@ -52,23 +64,48 @@ class PcapStreamer (Streamer):
         eprint("source is expected to be a string or a list of strings.")
         raise
       self.files=source
-      if(not dontsort):
-        self.files.sort()
     elif (source_type=="dir"):
-      for path in os.listdir(source):
-        if(pathfilter(path)):
-          self.files.append(f"{source}/{path}")
+      for filename in os.listdir(source):
+        if(filenamefilter(filename)):
+          self.files.append(f"{source}/{filename}")
+
+    if(not dontsort):
       self.files.sort()
+    
+    # hook the first streamer
+    self._hook_next_streamer()
+
+  def summary(self):
+    print("The file to be used:")
+    for f in self.files:
+      print(f"  {f}")
+
+  def _hook_next_streamer(self):
+    if(self._nxt_streamer_index >= len(self.files)):
+      self._streamer = None
+      return None
+    filepath = self.files [self._nxt_streamer_index]
+    self._nxt_streamer_index += 1
+    self._streamer = Parser(filepath, buffersize=self._bufsize) # check memory utilization with buffer size
+    return self._streamer
+  
+  def getnext(self):
+    if(self._streamer == None):
+      return None
+    p = self._streamer.getnext_pkt()
+    if(p):
+      return p
+    else:
+      self._hook_next_streamer()
+      return self.getnext()    # this might run into non-stoping recursion
 
   def source_generator(self):
-    for filepath in self.files:
-      reader = Parser(filepath, buffersize=100000) # check memory utilization with buffer size
-      while(True):
-        p = reader.getnext_pkt()
-        if(p):
-          yield p
-        else:
-          break
+    while(True):
+      p = self.getnext()
+      if(p):
+        yield p
+      else:
+        break
 
 class FtdObjStreamer (Streamer):
   def __init__(self, source, source_type, buffersize=100000, dontsort=False, pathfilter=None) -> None:
@@ -78,7 +115,7 @@ class FtdObjStreamer (Streamer):
       pathfilter=lambda x: x.endswith(".ftd")
 
     self._streamer=None
-    self._streamer_index=0
+    self._nxt_streamer_index=0
 
     self.files = []
     if(source_type=="file" or source_type=="files"):

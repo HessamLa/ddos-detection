@@ -1,5 +1,7 @@
 import sys
+from pathlib import Path
 import pickle
+from typing import Pattern
 
 from .helpers import eprint
 # from datastructures import structures
@@ -61,20 +63,41 @@ class pickle_read:
         return
 
 class pickle_write:
-    def __init__ (self, filepath, mode='wb'):
+    def __init__ (self, filepath, mode='wb', partition_size=None):
+        """partition size is given in bytes"""
         self.name = filepath
-        self.filepath = filepath
+        self.partition_size = partition_size
+        self.file_id = 0
+        self.filepath_base = filepath
+        if(partition_size==None):
+            self.filepath = self.filepath_base
+        else:
+            self.filepath = f"{self.filepath_base}-{self.file_id:04d}"
+        self._open(mode)
+        
+    def _open(self, mode="wb"):
         try:
-            self.f = open(self.filepath, mode)
+            self._f = open(self.filepath, mode)
         except:
             eprint ("ERR: Failed to open/create the file", self.filepath)
             eprint ("pickle_write.__init__()")
             raise
-        return
-    
+
+    def partition_if_required(self):
+        if(self.partition_size == None):
+            return
+        if (Path(self.filepath).stat().st_size < self.partition_size):
+            return
+        self.close_file()
+        self.file_id += 1
+        self.filepath = f"{self.filepath_base}-{self.file_id:04d}"
+        print("NEW PARTITION", self.filepath)
+        self._open()
+
     def dump (self, obj):
+        self.partition_if_required()
         try:
-            pickle.dump (obj, self.f)
+            pickle.dump (obj, self._f)
         except:
             eprint ("ERR: Problem dumping the pickle to", self.filepath)
             eprint ("pickle_write.dump()")
@@ -82,8 +105,8 @@ class pickle_write:
         return
     
     def close_file (self):
-        if (self.f != None):
-            self.f.close()
+        if (self._f != None):
+            self._f.close()
         return
 
 if __name__ == "__main__":

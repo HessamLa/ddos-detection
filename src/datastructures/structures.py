@@ -9,7 +9,6 @@ class flow_packet():
         pass
         # all the following attributes are to be set after creating the object
         # self.type    = None # packet type
-        # self.tc     = 0 # timestamp of the first packet of the flow
         # self.ts     = 0 # timestamp of the this packet of the flow
         # self.len    = 0 # packet length
         # self.saddr  = 0x00000000  # source address

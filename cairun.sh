@@ -1,37 +1,56 @@
 #!/bin/bash
 
-#SBATCH -J caida_t10
+#SBATCH -J caida_ftd-t5
 #SBATCH -p gpu
 #SBATCH -o log_%j.txt
 #SBATCH -e log_%j.err
 #SBATCH --nodes=1
-#SBATCH --time=8:00:00
+#SBATCH --time=1-23:59:59
 #SBATCH --ntasks-per-node=5
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=160G
 
+###
 DDOS_DIR=~/ddos-detection
 CODE_DIR=${DDOS_DIR}/src
 
+###
 DS_NAME=maccdc2012
 DS_NAME=caida
 DS_NAME=cicddos2019
-DS_NAME=test_cicddos2019
+#DS_NAME=test_cicddos2019
 
+### directories
 DS_DIR=$DDOS_DIR/datasets/$DS_NAME
-
 PCAP_DIR=${DS_DIR}/pcap
 FTD_DIR=${DS_DIR}/ftd-t5
-
 OUT_DIR=${DS_DIR}/output
 
-if [[ $1 = pcap2ftd ]] ; then
+### input and output filename patterns
+
+FN_PATTERN="*.pcap"
+# FTD basename
+# FN_PATTERN="SAT-01-12*.pcap"
+# FTD_BASENAME="ftd_SAT-01-12"
+
+FN_PATTERN="SAT-03-11*.pcap"
+FTD_BASENAME="ftd_SAT-03-11"
+
+adddate() {
+# https://serverfault.com/a/310104
+    while IFS= read -r line; do
+        printf '%s %s\n' "$(date -u +%Y-%m-%d-%T)" "$line";
+    done
+}
+
+if [[ $1 = makeftd ]] ; then
   date
   echo "****************************************"
   echo "* Making FTD Shots **********************"
   TIME=5
   FTD_DIR=${DS_DIR}/ftd-t${TIME}
   mkdir -p $FTD_DIR
+  PART_SIZE=$((50*1024)) # partition size of the FTD pickle files
   echo "* PCAP Source Dir:     $PCAP_DIR"
   echo "* FTD Destination Dir: $FTD_DIR"
   echo "* Time Resolution:     ${TIME}s"
@@ -47,11 +66,21 @@ if [[ $1 = pcap2ftd ]] ; then
   # echo "sudo mkdir $FTD_DIR"
   # sudo mkdir $FTD_DIR
 
-  c="${CODE_DIR}/pcap2ftd.py -p $PCAP_DIR -o $FTD_DIR -t $TIME > log-ftdshots-t${TIME}.tmp"
-  # c="srun -n 1 $c"  # this line is added for slurm job manager
+  c="python3 -u ${CODE_DIR}/pcap2ftd.py  $PCAP_DIR  $FTD_DIR"
+  
+  # add other arguments
+  c="$c --timewin=${TIME} --partition-size=$PART_SIZE"
+  c="$c --filename-pattern=$FN_PATTERN --ftd-basename=$FTD_BASENAME" 
+  
+  # log with timestamp adddate will add timestamp to each output line of the program
+  c="$c | adddate > log-ftdshots-t${TIME}-${FTD_BASENAME}.tmp" 
+  
+  # in case we want the slurm job manager
+  c="srun -n 1 $c "  # this line is added for slurm job manager
+  
   echo $c;
   eval $c
-
+  exit 
   # echo "sudo rm $PIPE"
   # sudo rm $PIPE
 
@@ -59,6 +88,8 @@ elif ! [ -z "$1" ] ; then
   T=$1
   echo "t is $T"
 fi
+
+exit
 if [ -z "$T" ] ; then
   times=( 60 30 20 10 5 )
   # times=( 20 10 5 )

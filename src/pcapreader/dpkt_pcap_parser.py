@@ -200,11 +200,10 @@ class Parser (object):
     def _open_pcap (self):
         fname = self.filename
         if fname [-3:] == '.gz':
-            eprint('Opening compressed file:', fname)
             f = gzip.open (fname, 'rb')
         else:
             f = open (fname, 'rb')
-        eprint ('PCAP Filename:', fname)
+        print ('PCAP Filename:', fname)
         self.pcap = dpkt.pcap.Reader (f)
         # self._iter = iter(self)
         dlink = self.pcap.datalink()
@@ -212,7 +211,7 @@ class Parser (object):
             eprint ("Datalink type: {:3d} Unknown".format (dlink) )
             raise
         else:
-            eprint ("Datalink type: {:3d} {}".format (dlink, datalinks[dlink][0]))
+            # print ("Datalink type: {:3d} {}".format (dlink, datalinks[dlink][0]))
             self.pkt_handler = globals()[datalinks [dlink][1]]
 
         return

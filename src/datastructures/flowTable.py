@@ -110,6 +110,7 @@ class FlowEntry (AssociativeEntry):
     """
     AssociativeEntry.__init__ (self, key=hashCode, dirty=True)
     self.new   = True # New Flow flag. True, if this is a new flow entry
+    self.dirty = True
 
     self.ts   = p.ts  # time-stamp, records latest modifcation time of this flow entry
     self.ts0  = p.ts  # time-stamp, records previous modification time 
@@ -130,21 +131,26 @@ class FlowEntry (AssociativeEntry):
     self.req_freq    = None # Request frequency
     self.req_phase_shift = None # Request phase shift
 
+  def __repr__(self, oneliner=True) -> str:
+      r = ""
+      if(oneliner):
+        for k,v in self.to_dict().items():
+            r+=f"{k}:{v} "
+        return r
   # @NOTE: The following two methods must be modified together, since they reflect on the same data
   def to_dict(self):
     """Returns the entry data as dict. The dictionary keys can also be used as columns for converting flowentries data to DataFrame"""
-    D={"ts_latest":self.ts, "ts_previous":self.ts0, "ts_created":self.tc,
+    D={"ts_created":self.tc, "ts_latest":self.ts, "ts_previous":self.ts0,
       "saddr":self.saddr, "daddr":self.daddr, "proto":self.proto, "sport":self.sport, "dport":self.dport,
       "pktcnt":self.pktCnt, "pktlen":self.pktLen}
     return D
   
   def to_list(self):
     """Retunrs the entry data as list"""
-    L = [self.ts, self.ts0, self.tc]
+    L = [self.tc, self.ts, self.ts0]
     L+= [self.saddr, self.daddr, self.proto, self.sport, self.dport]
     L+= [self.pktCnt, self.pktLen]
     return L
-
 
   def reset (self):
     self.dirty = False
@@ -163,6 +169,26 @@ class FlowEntry (AssociativeEntry):
     self.pktCnt += difCnt
     self.pktLen += difLen
     return
+
+  def merge (self, f):
+    """Merges the given flow entry into this one by doing the following:
+      1. The cnt and len values will be aggregated.
+      2. ts and ts0 will be set to the older ones.
+      3. tc will be set to the earliest one.
+    """
+    self.pktCnt += f.pktCnt
+    self.pktLen += f.pktLen
+
+    if(self.ts < f.ts):
+      self.ts = f.ts
+    
+    if(self.ts0 < f.ts0):
+      self.ts0 = f.ts0
+    
+    if(self.tc > f.tc):
+      self.tc = f.tc
+    
+    self.dirty = True
 
   @property
   def age (self):
@@ -277,10 +303,6 @@ class FlowTable (AssociativeTable):
 
   def add_packet (self, p):
     """Adds the packet p to the flow table. Returns key of the corresponding entry"""
-    # print(p)
-    # h = hash (str([p.saddr, p.daddr, p.proto, p.sport, p.dport]))
-    # print(h)
-    # exit()
     h = hash (str([p.saddr, p.daddr, p.proto, p.sport, p.dport])) # Make a hash of packet
     try:
       self.tbl [h].add (p.ts, 1, p.len)
@@ -299,17 +321,31 @@ class FlowTable (AssociativeTable):
     #   self.tbl [h].add (p.ts, 1, p.len)
     # return
 
-  def add_table (self, t):
+  def merge (self, ftd):
+    """Merges the given flow table into this one"""
+    self.merge_tbl(ftd)
+
+  def merge_ftd (self, ftd):
+    """Merges the given flow table into this one"""
+    self.merge_tbl(ftd.tbl)
+  
+  def merge_tbl (self, tbl):
+    """Merges contents of the given flow table into this one.
+    If this table is empty, a new table is created and copied over.
+    Otherwise, for each entry in the given table the following happens:
+    If the entry does not exist in this table, just copy the entry.
+    Otherwise, merge the entry into the existing one."""
     if (self.size == 0):
-      self.maketbl (t.tbl)
+      self.maketbl (tbl)
       return
 
-    for h, f in t.items():
+    for h, f in tbl.items():
       try:
-        self.tbl[h].add (f.ts, f.dif_cnt, f.dif_len)
+        self.tbl[h].merge(f)          # if the entry exists
       except KeyError:
-        self.tbl[h] = f.copy()
-      if self.tbl[h].new == True: # New entries are also dirty
+        self.tbl[h] = f.copy()        # if the entry doesn't exist
+
+      if self.tbl[h].new == True: # New entries are also dirty (to avoid one if branch)
         self.__new_keys.add (h)
         self.__dirty_keys.add (h)
       elif self.tbl[h].dirty == True:

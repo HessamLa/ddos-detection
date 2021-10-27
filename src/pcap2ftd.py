@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
 
-import getopt
+import os, sys
+from pickle import NONE
+from pathlib import Path
 import time
+import getopt
 from typing import Protocol
-import numpy as np
-import os
-import sys
-import matplotlib.pyplot as plt
-
-import dpkt
+import pandas as pd
 
 import utilities as util
-import datastructures
 
 from utilities import eprint
 from utilities import pickle_write, pickle_read
 from utilities import COLOR_CODE as C
-from datastructures.structures import FTDObj
 from datastructures.flowTable import FlowTable
 
-import switch
-
+from streamer import Streamer
 sys.path.append(".")
 
 class PCAP2FTD:
@@ -29,165 +24,107 @@ class PCAP2FTD:
     containing the partial flows in that time window, thus taking a shot of flows in a
     time window.
     """
-    def __init__ (self, pcapfilepath='.', ftdfilepath='.', timewin=5.0, protocol=''): # protocol is a comma-separted list
-        self.timewin = float(timewin) # SImulation time window in seconds. In each window, the packets will be analyzed
-        
-        self.switches = dict ()
-        self.ftdshot_writer = dict ()
+    def __init__ (self, flowpkt_streamer, time_start=None, timewin=5.0, packet_filter=None, name="NoName"):
+        """packet_filter is a function that verifies if a packet is OK (returns True) or should be skipped (returns False)
+        """
+        self.streamer = flowpkt_streamer
+        self.flowtable = FlowTable(name=name)
+        self.packetfilter = packet_filter
 
-        if (not os.path.exists(ftddir)):
-            os.makedirs(ftddir)
-            
-        times=[]
-        self.filepaths=[pcapfilepath]
-        for f in self.filepaths: # FOREACH switch PCAP file, read the file and create corresponding objects
-            # Create a switch object
-            sd = switch.Switch_Driver (f, 'pcap', pcapdir, self.timewin, protocol)
-            self.switches [f] = sd
-            times.append (float (sd.time))
+        self.total_pkt_counter=0
+        self.accepted_pkt_counter=0
+        if(time_start==None):
+            self.p = self.streamer.getnext() # get time of the first packet
+            self.tstart = (self.p.ts//timewin)*timewin # make time start divisible to 5
+            self.flowtable.add_packet(self.p) # also don't waste this packet
+            self.total_pkt_counter += 1
+            self.accepted_pkt_counter+=1
 
-            # Create dumper object for each switch
-            # fd = pickle_write (os.path.splitext (f)[0]+'.ftd', outdir=ftddir)
-            # filename = ftddir+'/'+os.path.splitext (f)[0]+'.ftd'
-            print("** TEST ftd output:", ftdfilepath)
-            self.ftdshot_writer [f] = pickle_write (ftdfilepath, mode='w+b')
-            print ("")
-        # readjust time of all switches to the earliest one
-        basetime = int (min (times)/timewin)*timewin
-        print ("Base Time:", basetime)
-        for sd in self.switches:
-            self.switches[sd].time = basetime
-
-    def run(self):
-        it = 0
-        alldone = False
-        while (not alldone):
-            print (C.YLW+'Time: {:.2f} to {:.2f}\033[m'.format ( it*self.timewin, (it+1)*self.timewin))
-            it += 1
-            
-            # Clear all flow tables before proceeding. This is because we need to boost
-            # the processing speed, and also we only need to store flow table content
-            # in each window
-            for d in self.switches:
-                self.switches [d].switch.flow_table.clear ()
-            
-            # all switches run
-            for d in self.switches:
-                sd = self.switches [d]
-                sd.progress ()
-
-                ftbl = sd.switch.flow_table
-                if (ftbl.size != 0):
-                    dumptype = FTDObj.DumpType.NEW_FLOWTABLE
-                    print ("New Flow table %s. Store %d entries."%(sd.switch.name, ftbl.size))
-                else:
-                    dumptype = FTDObj.DumpType.NO_FLOWTABLE_CHANGE
-                # for k in ftbl.keys():
-                #     tmp[k] = ftbl[k].copy()
-                # obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, tmp)
-                obj = FTDObj.pack_obj (dumptype, sd.protocols, sd.timewin, sd.time, ftbl)
-                self.ftdshot_writer [d].dump (obj)
-                #~Test ****************************************
-                # path=self.ftdshot_writer [d].filepath
-                # for d in self.ftdshot_writer:
-                #     self.ftdshot_writer [d].close_file()
-                # # path="/N/u/hessamla/Carbonate/ddos-detection/datasets/cicddos2019/ftd-t5/SAT-01-12-2018_0000.ftd"
-                # print(path)
-                # print(ftbl)
-                # ftbl.reset()
-                # ftbl.name="newname"
-                # print(ftbl)
-                # # reader = pickle_read(path)
-                # reader = pickle_read(path)
-                # obj = reader.get_next()
-                # (dumptype, protocols, timewin, time, ftbl2) = FTDObj.unpack_obj(obj)
-                # print(dumptype)
-                # print(ftbl2)
-                # # testreader = pickle_read (self.filepaths[0])
-                # print(ftbl.tbl)
-                # print(ftbl2.tbl)
-                # exit()
-            
-            # if all switches are done getting new packets, then 
-            alldone = True
-            for d in self.switches:
-                if self.switches[d].is_done == False:
-                    alldone = False
-            
-            sys.stdout.flush()
-            # END WHILE ##########################################
-
-        for d in self.ftdshot_writer:
-            self.ftdshot_writer [d].close_file()
-
-def parse_arguments (argv):
-    # pcapdir = "/home/datasets/caida/ddos-20070804"
-    # home = os.path.expanduser("~")
-    # pcapdir = "/tmp/hessamla/" # input files
-    # pcapdir = home+"/ais-install-321/ns-3.28/pcap-output/" # input files
-    # ftddir = home+"/ddos-detection/captures_netshot" # output files
-    # ftddir = home+"/ddos-detection/captures_maccdc2012" # output files
-    pcapdir = "."
-    ftddir = "."
-
-    timewin = 60.0
+        self.twin = float(timewin)
+        self.tlimit = self.tstart + self.twin
     
-    usage_msg = 'Usage: {} <inputfile> -o <csv-outputfile>'.format (argv[0])
+    def __iter__ (self):
+        for packet in self.streamer:
+            self.total_pkt_counter += 1
+            if(self.packetfilter!=None):
+                if(not self.packetfilter(packet)):
+                    continue # skipp this packet
+            
+            if (packet.ts >= self.tlimit ):
+                print("total packets", self.total_pkt_counter)
+                yield self.flowtable
+                self.flowtable.clear()
+                self.tlimit += self.twin
+            
+            self.flowtable.add_packet(packet)
+            self.accepted_pkt_counter+=1
+            
 
-    if (len (argv) <= 1):
-        eprint ('WARN: No arguments are passed. Using default values.')
-        eprint (usage_msg)
-
-    try:
-        opts, args = getopt.getopt(argv[1:],"hcp:t:o:",["help", "idir=", "timewin=", "odir"])
-    except getopt.GetoptError:
-        eprint ('ERR: Problem reading arguments.')
-        eprint (usage_msg)
-        sys.exit(2)
-    for opt, arg in opts:
-        if opt in ("-h", "--help"):
-            eprint (usage_msg)
-            eprint ("-h (--help)                   Prints this help")
-            eprint ("-p (--idir) <pcap-directory>  Directory containing PCAP files")
-            eprint ("-o (--odir) <ftd-directory>   Output directory for flow-table data")
-            eprint ("-t (--timewin) <seconds>      Width of each time window in seconds")
-            sys.exit()
-        elif opt in ("-p", "--idir"):
-            pcapdir = arg
-        elif opt in ("-o", "--odir"):
-            print (arg)
-            ftddir = arg
-        elif opt in ("-t", "--timewin"):
-            timewin = float (arg)
-    
-    eprint ("")
-    eprint ("*   Dir PCAPs =", pcapdir)
-    eprint ("*Dir NetShots =", ftddir)
-    eprint ("* Time Window =", timewin , 'seconds')
-    eprint ("")
-
-    return pcapdir, ftddir, timewin
+pcapdir="./datasets/cicddos2019/pcap"
+ftddfdir="./"
+timewin=1.0
 
 if __name__ == "__main__":
-    pcapdir, ftddir, timewin = parse_arguments (sys.argv)
-    # eprint ("Press anykey to coninue...")
-    # input()
+    import argparse
+    parser = argparse.ArgumentParser(description="FlowTable generator")
+    
+    parser.add_argument("pathsrc", type=str,
+                help="Source path to the file or directory containing the PCAP files.")
+    
+    parser.add_argument("pathdst", type=str,
+                help="Destination path to the file or directory where FTD pickles will be stored.")
+    
+    parser.add_argument("--typesrc", type=str, default="dir", choices=["dir", "file"],
+                help="Type of the source path")
+    
+    parser.add_argument("--typedst", type=str, default="dir", choices=["dir", "file"],
+                help="Type of the source path")
+    
+    parser.add_argument("--filename-pattern", type=str, default=None,
+                help="A Unix filename pattern matching for filtering the list of input files. Those that don't match will be discarded."+
+                    " ex. *.pcap or SAT*.pcap")
+    
+    parser.add_argument("--partition-size-KB", type=int, default=None,
+                help="Partition FTD pickle files to into the given size in KB.")
+    
+    parser.add_argument("--ftd-basename", type=str, default="ftd",
+                help="Base name for the destinatoin file. If type_dst is file, then this option is omited.")
+    
+    parser.add_argument("-t", "--timewin", type=float, default=5.0,
+                help="Time window for each flowtable.")
+    
+    args = parser.parse_args()
+    print(args)
+    if  (args.typedst == "dir"):
+        # Path(args.pathdst).mkdir(parents=True, exist_ok=True)
+        ftdfilepath=f"{args.pathdst}/{args.ftd_basename}"
+    elif(args.typedst == "file"):
+        # Path(args.pathdst).parent.absolute().mkdir(parents=True, exist_ok=True)
+        ftdfilepath=args.pathdst
+    
+    
+    fnfilter=None
+    if (args.filename_pattern):
+        import fnmatch
+        fnfilter=lambda x: fnmatch.fnmatch(x, args.filename_pattern)
+    
+    pwriter = pickle_write(ftdfilepath, partition_size=args.partition_size_KB*1024)
+    streamer=Streamer.Make(source=args.pathsrc, source_type=args.typesrc, source_format="pcap",
+                            buffersize=1, filenamefilter=fnfilter)
+    streamer.summary()
+    pcap_to_ftd = PCAP2FTD(streamer, timewin=args.timewin)
+    for ftd in pcap_to_ftd:
+        pwriter.dump(ftd)
 
-    try:
-        os.makedirs(ftddir)
-    except:
-        pass
-
-    timewin=5.0
-    protocol={dpkt.ip.IP_PROTO_TCP,dpkt.ip.IP_PROTO_UDP,dpkt.ip.IP_PROTO_ICMP}
-    for filepath in os.listdir(pcapdir):
-        if (not filepath.endswith(".pcap")):
-            continue
-        pcappath=f"{pcapdir}/{filepath}"
-        ftdpath=f"{ftddir}/{filepath[:-5]}.ftd"
-        convert = PCAP2FTD (pcapfilepath=pcappath,
-                        ftdfilepath=ftdpath,
-                        timewin=timewin,
-                        protocol=protocol)
-        convert.run()
-
+        # all_entries=[]
+        # for hashkey, flowentry in ftd.tbl.items():
+        #     v = flowentry
+        #     E = [hashkey]
+        #     E+= [v.ts, v.ts0, v.tc]
+        #     E+= [v.saddr, v.daddr, v.proto, v.sport, v.dport]
+        #     E+= [v.pktCnt, v.pktLen]
+        #     all_entries += [E]
+        # df = pd.DataFrame(all_entries, columns=["hashkey", "ts_latest","ts_previous", "ts_created", "saddr", "daddr", "proto", "sport", "dport", "pktcnt", "pktlen"])
+        # print(df.head())
+        # convert ftd to pandas
+    pwriter.close_file()
