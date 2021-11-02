@@ -46,13 +46,17 @@ class PCAP2FTD:
     def __iter__ (self):
         for packet in self.streamer:
             self.total_pkt_counter += 1
-            if(self.packetfilter!=None):
+            try:
                 if(not self.packetfilter(packet)):
                     continue # skipp this packet
-            
+            except:
+                pass
+
             if (packet.ts >= self.tlimit ):
-                print("total packets", self.total_pkt_counter)
-                yield self.flowtable
+                print(f"@timelimit {self.tlimit} total packets {self.total_pkt_counter}")
+                ts_from = self.tlimit - self.twin
+                ts_to = self.tlimit
+                yield ts_from, ts_to, self.flowtable
                 self.flowtable.clear()
                 self.tlimit += self.twin
             
@@ -113,8 +117,9 @@ if __name__ == "__main__":
                             buffersize=1, filenamefilter=fnfilter)
     streamer.summary()
     pcap_to_ftd = PCAP2FTD(streamer, timewin=args.timewin)
-    for ftd in pcap_to_ftd:
-        pwriter.dump(ftd)
+    for ts_from, ts_to, ftd in pcap_to_ftd:
+        obj = (ts_from, ts_to, ftd)
+        pwriter.dump(obj)
 
         # all_entries=[]
         # for hashkey, flowentry in ftd.tbl.items():
@@ -127,4 +132,4 @@ if __name__ == "__main__":
         # df = pd.DataFrame(all_entries, columns=["hashkey", "ts_latest","ts_previous", "ts_created", "saddr", "daddr", "proto", "sport", "dport", "pktcnt", "pktlen"])
         # print(df.head())
         # convert ftd to pandas
-    pwriter.close_file()
+    pwriter.close()
