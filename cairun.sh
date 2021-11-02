@@ -39,7 +39,7 @@ FTD_BASENAME="ftd_SAT-03-11"
 adddate() {
 # https://serverfault.com/a/310104
     while IFS= read -r line; do
-        printf '%s %s\n' "$(date -u +%Y-%m-%d-%T)" "$line";
+        printf '%s  %s\n' "$(date -u +%Y-%m-%d-%T)" "$line";
     done
 }
 
