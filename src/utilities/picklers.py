@@ -57,8 +57,8 @@ class pickle_read:
                 eprint("pickle_read.objects() Unknown exception")
                 raise
     
-    def close_file (self):
-        if (self.f != None):
+    def close (self):
+        if (self.f):
             self.f.close()
         return
 
@@ -84,6 +84,8 @@ class pickle_write:
             raise
 
     def partition_if_required(self):
+        """This method will check if the destination file size. If the file quota is passed, it will close the current
+        file and open another file. It will increment the filename number by one."""
         if(self.partition_size == None):
             return
         if (Path(self.filepath).stat().st_size < self.partition_size):
@@ -104,8 +106,8 @@ class pickle_write:
             raise
         return
     
-    def close_file (self):
-        if (self._f != None):
+    def close (self):
+        if (self._f):
             self._f.close()
         return
 
