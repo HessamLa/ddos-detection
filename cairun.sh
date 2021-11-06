@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -J caida_ftd-t5
+#SBATCH -J cicddos_t5_SAT-03-11
 #SBATCH -p gpu
 #SBATCH -o log_%j.txt
 #SBATCH -e log_%j.err
@@ -28,13 +28,11 @@ OUT_DIR=${DS_DIR}/output
 
 ### input and output filename patterns
 
-FN_PATTERN="*.pcap"
-# FTD basename
-# FN_PATTERN="SAT-01-12*.pcap"
-# FTD_BASENAME="ftd_SAT-01-12"
-
-FN_PATTERN="SAT-03-11*.pcap"
-FTD_BASENAME="ftd_SAT-03-11"
+X="SAT-01-12"
+# X="SAT-03-11"
+FN_PATTERN="${X}*.pcap" #filter name for input files
+FTD_BASENAME="ftd_${X}"
+DF_BASENAME="df_${X}"
 
 adddate() {
 # https://serverfault.com/a/310104
@@ -50,9 +48,16 @@ if [[ $1 = makeftd ]] ; then
   TIME=5
   FTD_DIR=${DS_DIR}/ftd-t${TIME}
   mkdir -p $FTD_DIR
+
+  DF_DIR=${DS_DIR}/df-t${TIME}
+  mkdir -p $FTD_DIR
+
+  LOG_FILE=log-ftdshots-t${TIME}-${FTD_BASENAME}.tmp
+
   PART_SIZE=$((50*1024)) # partition size of the FTD pickle files
   echo "* PCAP Source Dir:     $PCAP_DIR"
-  echo "* FTD Destination Dir: $FTD_DIR"
+  echo "* FTD Dest. Dir: $FTD_DIR"
+  echo "* DataFrame Dest. Dir: $DF_DIR"
   echo "* Time Resolution:     ${TIME}s"
   # echo "* Pipe:                  $PIPE"
   # PIPE=${PCAP_DIR}/p.pcap
@@ -70,16 +75,23 @@ if [[ $1 = makeftd ]] ; then
   
   # add other arguments
   c="$c --timewin=${TIME} --partition-size=$PART_SIZE"
+  
+  # set the input files pattern and the output FTD basename
   c="$c --filename-pattern=$FN_PATTERN --ftd-basename=$FTD_BASENAME" 
   
+  # also set the destination for Dataframes directory and basename
+  c="$c --dataframe-path=$DF_DIR --df-basename=$DF_BASENAME" 
+  
   # log with timestamp adddate will add timestamp to each output line of the program
-  c="$c | adddate > log-ftdshots-t${TIME}-${FTD_BASENAME}.tmp" 
+  c="$c | adddate > $LOG_FILE" 
   
   # in case we want the slurm job manager
   c="srun -n 1 $c "  # this line is added for slurm job manager
-  
+
   echo $c;
   eval $c
+
+  echo "Done making FTDs" | adddate > $LOG_FILE
   exit 
   # echo "sudo rm $PIPE"
   # sudo rm $PIPE

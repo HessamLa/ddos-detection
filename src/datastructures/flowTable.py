@@ -1,3 +1,6 @@
+from os import name
+
+from pandas.core.indexes.api import all_indexes_same
 from .structures import AssociativeEntry
 from .structures import AssociativeTable
 from .structures import flow_packet
@@ -259,6 +262,22 @@ class FlowTable (AssociativeTable):
           if self [h].new == True:
             self.__new_keys.add (h)
     return
+
+  def to_df(self):
+    import pandas as pd
+    all_entries = []
+    for hashkey, flowentry in self.tbl.items():
+        v = flowentry
+        E = [hashkey]
+        E+= [v.ts, v.ts0, v.tc]
+        E+= [v.saddr, v.daddr, v.proto, v.sport, v.dport]
+        E+= [v.pktCnt, v.pktLen]
+        all_entries += [E]
+    columns=["hashkey", "ts_latest","ts_previous", "ts_created", "saddr", "daddr", "proto", "sport", "dport", "pktcnt", "pktlen"]
+    df = pd.DataFrame(all_entries, columns=columns)
+    return df
+        
+
 
   @property
   def dirtyKeys (self):

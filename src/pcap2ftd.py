@@ -78,6 +78,13 @@ if __name__ == "__main__":
     parser.add_argument("pathdst", type=str,
                 help="Destination path to the file or directory where FTD pickles will be stored.")
     
+    parser.add_argument("--dataframe-path", type=str, default=None,
+                help="Destination path to the file or directory where Pandas DataFrame format of FTD will be stored.")
+    
+    parser.add_argument("-nodf", action="store_true", default=False,
+    help="If set to True, will not store FTDs in DataFrame pickle format.")
+    
+
     parser.add_argument("--typesrc", type=str, default="dir", choices=["dir", "file"],
                 help="Type of the source path")
     
@@ -92,8 +99,11 @@ if __name__ == "__main__":
                 help="Partition FTD pickle files to into the given size in KB.")
     
     parser.add_argument("--ftd-basename", type=str, default="ftd",
-                help="Base name for the destinatoin file. If type_dst is file, then this option is omited.")
-    
+                help="Base name for the destination file. If type_dst is file, then this option is omited.")
+
+    parser.add_argument("--df-basename", type=str, default="df",
+                help="Base name for the destination file. If type_dst is file, then this option is omited.")
+
     parser.add_argument("-t", "--timewin", type=float, default=5.0,
                 help="Time window for each flowtable.")
     
@@ -102,34 +112,42 @@ if __name__ == "__main__":
     if  (args.typedst == "dir"):
         # Path(args.pathdst).mkdir(parents=True, exist_ok=True)
         ftdfilepath=f"{args.pathdst}/{args.ftd_basename}"
+        dffilepath=f"{args.pathdst}/{args.df_basename}"
+        if(args.dataframe_path): # 
+            dffilepath=f"{args.dataframe_path}/{args.df_basename}"
+
     elif(args.typedst == "file"):
         # Path(args.pathdst).parent.absolute().mkdir(parents=True, exist_ok=True)
         ftdfilepath=args.pathdst
-    
+        dffilepath=args.pathdst
+        if(args.dataframe_path): # 
+            dffilepath=f"{args.dataframe_path}"
+        
     
     fnfilter=None
     if (args.filename_pattern):
         import fnmatch
         fnfilter=lambda x: fnmatch.fnmatch(x, args.filename_pattern)
     
-    pwriter = pickle_write(ftdfilepath, partition_size=args.partition_size_KB*1024)
-    streamer=Streamer.Make(source=args.pathsrc, source_type=args.typesrc, source_format="pcap",
+    ftdwriter = pickle_write(ftdfilepath, filepath_ext=".ftd", partition_size=args.partition_size_KB*1024)
+    
+    if(args.nodf == False):
+        dfwriter  = pickle_write(dffilepath, filepath_ext=".df", partition_size=args.partition_size_KB*1024)
+    
+    streamer  = Streamer.Make(source=args.pathsrc, source_type=args.typesrc, source_format="pcap",
                             buffersize=1, filenamefilter=fnfilter)
     streamer.summary()
-    pcap_to_ftd = PCAP2FTD(streamer, timewin=args.timewin)
-    for ts_from, ts_to, ftd in pcap_to_ftd:
-        obj = (ts_from, ts_to, ftd)
-        pwriter.dump(obj)
 
-        # all_entries=[]
-        # for hashkey, flowentry in ftd.tbl.items():
-        #     v = flowentry
-        #     E = [hashkey]
-        #     E+= [v.ts, v.ts0, v.tc]
-        #     E+= [v.saddr, v.daddr, v.proto, v.sport, v.dport]
-        #     E+= [v.pktCnt, v.pktLen]
-        #     all_entries += [E]
-        # df = pd.DataFrame(all_entries, columns=["hashkey", "ts_latest","ts_previous", "ts_created", "saddr", "daddr", "proto", "sport", "dport", "pktcnt", "pktlen"])
-        # print(df.head())
-        # convert ftd to pandas
-    pwriter.close()
+    pcap_to_ftd = PCAP2FTD(streamer, timewin=args.timewin)
+    
+    for ts_from, ts_to, ftd in pcap_to_ftd:
+        obj={"ts_from":ts_from, "ts_to":ts_to, "FlowTable":ftd}
+        ftdwriter.dump(obj)
+
+        if(args.nodf == False):
+            df = ftd.to_df()
+            obj={"ts_from":ts_from, "ts_to":ts_to, "FlowTable":df}
+            dfwriter.dump(obj)
+
+    ftdwriter.close()
+    dfwriter.close()
