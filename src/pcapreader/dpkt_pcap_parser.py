@@ -67,7 +67,7 @@ def handle_ethernet (ts, pkt):
     return (eth.data, eth.type)
     # return obj.process_ip (ts, eth.data), eth.type
 
-def handle_ip (ts, pkt, obj):
+def handle_ip (ts, pkt):
     try:
         ip = dpkt.ip.IP (pkt)
     except dpkt.dpkt.UnpackError:
@@ -182,7 +182,7 @@ class Parser (object):
         self.x = 10
         self.last_ts = 0
         self.filename = filename
-
+        self.fileobj = None # this will be opened in _open_pcap
         self.pkt_handler = None
 
         # This cache works as a queue
@@ -197,22 +197,30 @@ class Parser (object):
         self._open_pcap ()
         return
 
+    def __del__(self) -> None:
+        self._close_pcap()
+        
+    def _close_pcap(self):
+        if(self.fileobj):
+            self.fileobj.close()
+        
     def _open_pcap (self):
         fname = self.filename
         if fname [-3:] == '.gz':
-            f = gzip.open (fname, 'rb')
+            self.fileobj = gzip.open (fname, 'rb')
         else:
-            f = open (fname, 'rb')
-        print ('PCAP Filename:', fname)
-        self.pcap = dpkt.pcap.Reader (f)
+            self.fileobj = open (fname, 'rb')
+        # print ('PCAP Filename:', fname)
+        self.pcap = dpkt.pcap.Reader (self.fileobj)
         # self._iter = iter(self)
         dlink = self.pcap.datalink()
         if dlink not in datalinks:
-            eprint ("Datalink type: {:3d} Unknown".format (dlink) )
+            print ("Datalink type: {:3d} Unknown".format (dlink) )
             raise
         else:
             # print ("Datalink type: {:3d} {}".format (dlink, datalinks[dlink][0]))
             self.pkt_handler = globals()[datalinks [dlink][1]]
+            # print(f"\"{self.pkt_handler.__name__}\" is set as the packet handler function")
 
         return
 

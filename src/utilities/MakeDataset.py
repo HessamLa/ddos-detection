@@ -89,15 +89,17 @@ def NormalizeDataLinear (minimum, maximum, *args):
     return t[0]
   return t
 
-def load_dataframes (filepaths, col_order=None):
-  # filepaths: an array of path strings to csv files
-  # assumes column 'time' is the index
+def load_dataframes (filepaths, index_column='time', column_order=None):
+  """
+  filepaths: an array of path strings to csv files
+  assumes column 'time' is the index
+  """
   assert type(filepaths) == list, 'filepaths must be an array of path strings'
   dfs = [] # the list of dataframes
   for path in filepaths:
-    df = pd.read_csv (path, index_col='time')
-    if (col_order is not None):
-      df = df[col_order]
+    df = pd.read_csv (path, index_col=index_column)
+    if (column_order is not None):
+      df = df[column_order]
     dfs.append (df)
   return dfs
 

@@ -1,4 +1,5 @@
 from os import name
+import copy
 
 from pandas.core.indexes.api import all_indexes_same
 from .structures import AssociativeEntry
@@ -172,7 +173,7 @@ class FlowEntry (AssociativeEntry):
     self.pktCnt += difCnt
     self.pktLen += difLen
     return
-
+    
   def merge (self, f):
     """Merges the given flow entry into this one by doing the following:
       1. The cnt and len values will be aggregated.
@@ -218,7 +219,7 @@ class FlowEntry (AssociativeEntry):
       self.saddr, self.daddr, self.proto, self.sport, self.dport)
     print ("pkt_cnt pkt_len:", self.pktCnt, self.pktLen)
 
-
+# ########################################################
 class FlowTable (AssociativeTable):
   def __init__ (self, id=0, name=None, entry_max_age=10):
     AssociativeTable.__init__ (self, id, name)
@@ -248,7 +249,7 @@ class FlowTable (AssociativeTable):
   def __repr__(self) -> str:
     return self.get_summary()
   
-  def __populate_keys_sets (self):
+  def _populate_keys_sets (self):
     if (len (self.__new_keys) == 0): # IF new_keys is empty, THEN populate it
       if (len (self.__dirty_keys) == 0): # IF dirty_keys is empty, THEN populate it too
         for h, f in self.items ():
@@ -283,14 +284,14 @@ class FlowTable (AssociativeTable):
   def dirtyKeys (self):
     """Keys of dirty entries"""
     if (len (self.__dirty_keys) == 0):
-      self.__populate_keys_sets ()
+      self._populate_keys_sets ()
     return self.__dirty_keys
 
   @property
   def newKeys (self):
     """Keys of new entries"""
     if (len (self.__new_keys) == 0):
-      self.__populate_keys_sets ()
+      self._populate_keys_sets ()
     return self.__new_keys
 
   @property
@@ -313,11 +314,29 @@ class FlowTable (AssociativeTable):
     return
 
   def set_dirty_keys (self, dkeys):
+    if(not isinstance(dkeys, set)):
+      print(f"type {type(set)} is expected. type {type(dkeys)} is passed")
+      raise
     self.__dirty_keys = dkeys
     return
 
   def set_new_keys (self, nkeys):
+    if(not isinstance(nkeys, set)):
+      print(f"type {type(set)} is expected. type {type(nkeys)} is passed")
+      raise
     self.__new_keys = nkeys
+    return
+
+  def update_dirty_keys (self, dkeys):
+    if (len (self.__dirty_keys) == 0):
+      self._populate_keys_sets ()
+    self.__dirty_keys.update(dkeys)
+    return
+
+  def update_new_keys (self, nkeys):
+    if (len (self.__new_keys) == 0):
+      self._populate_keys_sets ()
+    self.__new_keys.update(nkeys)
     return
 
   def add_packet (self, p):
@@ -340,22 +359,46 @@ class FlowTable (AssociativeTable):
     #   self.tbl [h].add (p.ts, 1, p.len)
     # return
 
-  def merge (self, ftd):
-    """Merges the given flow table into this one"""
-    self.merge_tbl(ftd)
+  def merge (self, tbl:dict):
+    """Merges the given FlowTableData table into this one"""
+    self.merge_tbl(tbl)
 
   def merge_ftd (self, ftd):
     """Merges the given flow table into this one"""
-    self.merge_tbl(ftd.tbl)
-  
+    # if(type(self) != type(ftd)):
+    #   print(f"type {type(self)} is expected. type {type(ftd)} is given")
+    #   raise
+    # merge the two tables
+    keys0 = self.keys()
+    keys1 = ftd.keys()    
+    index_diff1= keys1 - keys0 # keys only in ftd.tbl
+    
+    ftd_only = {k:ftd.tbl[k] for k in index_diff1} # ftd.tbl only
+    
+    # merge the existing entries
+    index_intersect = keys1 & keys0 # intersection
+    for h in index_intersect:
+      self.tbl[h]. merge(ftd.tbl[h])
+    
+    self.tbl.update(ftd_only)
+    
+    # update set of all new and dirty keys 
+    self.update_new_keys (ftd.newKeys)
+    self.update_dirty_keys (ftd.dirtyKeys)
+    self.__totalpktCnt += ftd.__totalpktCnt
+    self.__totalpktLen += ftd.__totalpktLen
+      
   def merge_tbl (self, tbl):
     """Merges contents of the given flow table into this one.
     If this table is empty, a new table is created and copied over.
     Otherwise, for each entry in the given table the following happens:
     If the entry does not exist in this table, just copy the entry.
     Otherwise, merge the entry into the existing one."""
+
     if (self.size == 0):
       self.maketbl (tbl)
+      print("input table size is", len(tbl))
+      print("new size is", self.size)
       return
 
     for h, f in tbl.items():
@@ -405,23 +448,23 @@ class FlowTable (AssociativeTable):
       ftbl = FlowTable (id=self.id, name=self.name+'-CLONE')
       for h in self.newKeys:
         ftbl [h] = self [h]
-      ftbl.set_dirty_keys (self.dirtyKeys) # set of new keys is a subset of dirty keys
-      ftbl.set_new_keys (self.newKeys)
+      ftbl.set__dirty_keys (self.dirtyKeys) # set of new keys is a subset of dirty keys
+      ftbl.set__new_keys (self.newKeys)
       
       
     elif (clone_type == "new"):
       ftbl = FlowTable (id=self.id, name=self.name+'-NEW_ENTRIES')
       for h in self.newKeys:
         ftbl [h] = self [h]
-      ftbl.set_dirty_keys (self.newKeys) # set of new keys is a subset of dirty keys
-      ftbl.set_new_keys (self.newKeys)
+      ftbl.set__dirty_keys (self.newKeys) # set of new keys is a subset of dirty keys
+      ftbl.set__new_keys (self.newKeys)
       
     elif (clone_type == "dirty"):
       ftbl = FlowTable (id=self.id, name=self.name+'-DIRTY_ENTRIES')
       for h in self.dirtyKeys:
         ftbl [h] = self [h]
-      ftbl.set_dirty_keys (self.dirtyKeys) 
-      ftbl.set_new_keys (self.newKeys)
+      ftbl.set__dirty_keys (self.dirtyKeys) 
+      ftbl.set__new_keys (self.newKeys)
       
     else:
       eprint ("ERR: Wrong clone_type:", clone_type)

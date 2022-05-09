@@ -4,6 +4,7 @@ import os, sys
 from pickle import NONE
 from pathlib import Path
 import time
+from datetime import datetime
 import getopt
 from typing import Protocol
 import pandas as pd
@@ -24,18 +25,27 @@ class PCAP2FTD:
     containing the partial flows in that time window, thus taking a shot of flows in a
     time window.
     """
-    def __init__ (self, flowpkt_streamer, time_start=None, timewin=5.0, packet_filter=None, name="NoName"):
+    def __init__ (self, flowpkt_streamer, time_start=None, timewin=5.0, packet_filter=lambda x:  True, name="NoName", suppress_generator_output=False):
         """packet_filter is a function that verifies if a packet is OK (returns True) or should be skipped (returns False)
         """
         self.streamer = flowpkt_streamer
         self.flowtable = FlowTable(name=name)
         self.packetfilter = packet_filter
+        # if(packet_filter):
+        #     self.packetfilter = packet_filter
+        # else:
+        #     self.packetfilter = lambda x:  True
+
+        self.suppress_generator_output = suppress_generator_output
 
         self.total_pkt_counter=0
+        self.total_pkt_counter1=0
         self.accepted_pkt_counter=0
         if(time_start==None):
             self.p = self.streamer.getnext() # get time of the first packet
-            self.tstart = (self.p.ts//timewin)*timewin # make time start divisible to 5
+            self.tstart = (self.p.ts//timewin)*timewin # make time start divisible to timewin
+            print(f"first packet timestamp:{self.p.ts} ({datetime.fromtimestamp(self.p.ts)})")
+            print(f"    starting timestamp:{self.tstart} ({datetime.fromtimestamp(self.tstart)})")
             self.flowtable.add_packet(self.p) # also don't waste this packet
             self.total_pkt_counter += 1
             self.accepted_pkt_counter+=1
@@ -46,14 +56,18 @@ class PCAP2FTD:
     def __iter__ (self):
         for packet in self.streamer:
             self.total_pkt_counter += 1
-            try:
-                if(not self.packetfilter(packet)):
-                    continue # skipp this packet
-            except:
-                pass
+            # try:
+            #     if(not self.packetfilter(packet)):
+            #         continue # skipp this packet
+            # except:
+            #     pass
+            if(not self.packetfilter(packet)):
+                continue
 
             if (packet.ts >= self.tlimit ):
-                print(f"@timelimit {self.tlimit} total packets {self.total_pkt_counter}")
+                if(self.suppress_generator_output==False):
+                    print(f"@timelimit {self.tlimit} ({datetime.fromtimestamp(self.tlimit)}) total packets {self.total_pkt_counter}, window packets {self.total_pkt_counter - self.total_pkt_counter1}")
+                    self.total_pkt_counter1 = self.total_pkt_counter
                 ts_from = self.tlimit - self.twin
                 ts_to = self.tlimit
                 yield ts_from, ts_to, self.flowtable
@@ -62,11 +76,11 @@ class PCAP2FTD:
             
             self.flowtable.add_packet(packet)
             self.accepted_pkt_counter+=1
-            
+        print(f"last packet timestamp:{packet.ts} ({datetime.fromtimestamp(packet.ts)})")
 
-pcapdir="./datasets/cicddos2019/pcap"
-ftddfdir="./"
-timewin=1.0
+# pcapdir="./datasets/cicddos2019/pcap"
+# ftddfdir="./"
+# timewin=1.0
 
 if __name__ == "__main__":
     import argparse
@@ -138,9 +152,9 @@ if __name__ == "__main__":
                             buffersize=1, filenamefilter=fnfilter)
     streamer.summary()
 
-    pcap_to_ftd = PCAP2FTD(streamer, timewin=args.timewin)
+    pcap2ftd_streamer = PCAP2FTD(streamer, timewin=args.timewin)
     
-    for ts_from, ts_to, ftd in pcap_to_ftd:
+    for ts_from, ts_to, ftd in pcap2ftd_streamer:
         obj={"ts_from":ts_from, "ts_to":ts_to, "FlowTable":ftd}
         ftdwriter.dump(obj)
 

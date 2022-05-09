@@ -3,6 +3,8 @@
 import sys, os
 import pandas as pd
 import numpy as np
+import sklearn as sk
+# from sklearn.utils import shuffle
 
 import matplotlib.pyplot as plt
 # %%
@@ -61,6 +63,9 @@ TIME_WINDOW = args.twin
 CMETHOD = args.cmethod
 CFIELD = args.cfield
 
+# maximum cateogry ID to be read
+MAX_CID = 13
+
 if(FILENAME_PATTERN not in PATTERNS_GROUP):
   eprint("ERR ", FILENAME_PATTERN, "unknown")
   raise Exception("Unknown filename pattern")
@@ -71,12 +76,6 @@ if(CFIELD not in CFIELD_GROUP):
   eprint("ERR ", CFIELD, "unknown")
   raise Exception("Unknown categorization field")
 
-if (CMETHOD == "none"): # only one category
-  CID_GROUP = [0] # group of category IDs for this method
-else:
-  lastcid=20
-  CID_GROUP = [i+1 for i in range(lastcid)]
-
 print(f"filename pattern:{FILENAME_PATTERN}, time window:{TIME_WINDOW}, cmethod:{CMETHOD}, cfield:{CFIELD}")
 
 def load_data(filename):
@@ -85,15 +84,12 @@ def load_data(filename):
   reader.close()
   return data
 
-
 if (CMETHOD == "none"): # only one category
   CID_GROUP = [0] # group of category IDs for this method
 else:
-  lastcid=20
-  CID_GROUP = [i+1 for i in range(lastcid)]
+  CID_GROUP = [i+1 for i in range(MAX_CID)]
 
-
-ENTROPIES_DIR = f"./categories-tovictim-{FILENAME_PATTERN}/{CMETHOD}/{CFIELD}/t{TIME_WINDOW:02.0f}"
+ENTROPIES_DIR = f"./categories-tovictim-{FILENAME_PATTERN}_OLD/{CMETHOD}/{CFIELD}/t{TIME_WINDOW:02.0f}"
 # files = [f"{ENTROPIES_DIR}/cid{cid}.pkl" for f in os.listdir (ENTROPIES_DIR) if FILENAME_PATTERN in f]
 files = [f"{ENTROPIES_DIR}/cid{cid:02d}.pkl" for cid in CID_GROUP]
 
@@ -120,19 +116,9 @@ for cid, d in data.items():
   maindf[cid] = df.copy(deep=True)
 
 print("maindf is ready")
-# %%
-# # show
-# cid=3
-# df = maindf[cid].copy()
-# # print("duration", max(df.timestamp)-min(df.timestamp))
-# print(df.columns)
-# axs=df.plot(subplots=True, figsize=(60,40))
-# fig = axs[0].get_figure()
-# fig.suptitle(f"{ENTROPIES_DIR} cid:{cid}", fontsize=16)
-# plt.show()
-# fig.savefig(f"img-t{TIME_WINDOW}-cid{cid:02d}.png")
 #%%
-# collectd all df
+# collect all df
+# concatenate all data into one dataframe
 cid=CID_GROUP[0]
 # newdf = pd.DataFrame(maindf[cid]['label'])
 newdf = maindf[cid]['label'].copy()
@@ -141,7 +127,8 @@ cols=['flowcnt', 'pktcnt', 'meanpktcnt', 'stdpktcnt', 'meanpktlen',
       'stdpktlen', 'entropy-saddr', 'entropy-daddr', 'entropy-proto',
       'entropy-sport', 'entropy-dport']
 dfs=[newdf]
-for cid in maindf.keys():
+# for cid in maindf.keys():
+for cid in CID_GROUP:
   df = maindf[cid].copy()
   df.drop(columns=['label'], inplace=True)
   newcolnames = {}
@@ -157,43 +144,56 @@ newdf = pd.concat(dfs, axis=1)
 
 #%%
 from sklearn import preprocessing
-le = preprocessing.LabelEncoder()
-y = le.fit_transform(newdf['label'].values.ravel())
-# y is numpy. convert to ndarray, one-hot
+# le = preprocessing.LabelEncoder()
+# y_num = le.fit_transform(newdf['label'].values.ravel())
+# convert string labels to one-hot
+
+# separate data and labels
+datacolumns = [c for c in newdf.columns if c != 'label']
+print(len(datacolumns))
+Xdf = newdf[datacolumns]
+
+encoder = preprocessing.LabelBinarizer()
+ydf = newdf[['label']]
+
+# %%
+# get the values
+
+
+# # %%
+# # shuffle the data
+# # for random_state, pass an int for reproducible results across multiple function calls.
+# print(type(Xdf))
+# Xdf,ydf = sk.utils.shuffle(Xdf, ydf, random_state=None)
+
+# print(type(Xdf), type(ydf))
+# print(type(Xdf.values))
+
+# %%
+X = Xdf.values
+y = encoder.fit_transform(ydf.values.ravel())
+
+SEQ_SIZE=int(60*2/TIME_WINDOW) # 2 minutes
+print(f"Each segment size is {SEQ_SIZE} time units = {SEQ_SIZE*TIME_WINDOW} secs")
+offset=1
+Xt = X[:-offset]
+yt = y[offset:]
+print("original shapes:       ", X.shape, y.shape)
+print(f"offseted shapes by {offset:2d}: ", Xt.shape, yt.shape)
+Xsegs = md.make_subsequence(X[:-offset], seq_size=SEQ_SIZE)
+ysegs = md.make_subsequence(y[offset:], seq_size=SEQ_SIZE)
+print(f"segmented shapes by {SEQ_SIZE:2d}:", Xsegs.shape, ysegs.shape)
 
 
 # %%
-# print("TESTING OneHotEncoder")
-# onehotter = preprocessing.OneHotEncoder(handle_unknown="ignore")
-# print(newdf[['label']].head())
-# print(newdf[['label']].shape)
-# y = onehotter.fit_transform(newdf[['label']].values)
-# # %%
-# print(type(y))
-# print(y.toarray())
-# a = y.toarray()
-# print(type(a))
-# print(y.shape)
-# print(a.shape)
+# make train test validation sets
+from sklearn.model_selection import train_test_split
+X_train, X_rem, y_train, y_rem = train_test_split(Xsegs,ysegs, train_size=0.8)
+X_valid, X_test, y_valid, y_test = train_test_split(X_rem,y_rem, test_size=0.5)
 
-  
-# print(set(y))
-
-
-# %%
-# from sklearn import preprocessing
-# labelencoder = preprocessing.LabelEncoder()
-# y = labelencoder.fit_transform(df['label'])
-# X = df.copy()
-# X.drop(columns=['label'])
-
-# # %%
-# SEQ_SIZE=int(60*2/TIME_WINDOW) # 2 minutes
-# offset=1
-# Xsegs = md.make_subsequence(X[:-offset], seq_size=SEQ_SIZE)
-# ysegs = md.make_subsequence(y[offset:], seq_size=SEQ_SIZE)
-
-
+print(X_train.shape, y_train.shape)
+print(X_valid.shape, y_valid.shape)
+print(X_test.shape, y_test.shape)
 
 # %%
 df=newdf.copy(deep=True) # renaming

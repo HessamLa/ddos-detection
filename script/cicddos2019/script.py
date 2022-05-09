@@ -60,85 +60,7 @@ args = parser.parse_args()
 
 if(args.cmethod=="none"):
   args.cfield="any"
-# print(args)
 
-"""
-str_C_METHODS_FIELDS="none,any"
-CMETHODS=( catlog2 catlog10 catloge );
-CFIELDS=( pktcnt pktlen );
-
-for CMETHOD   in "${CMETHODS[@]}";  do
-for CFIELD    in "${CFIELDS[@]}";   do
-  str_C_METHODS_FIELDS="${str_C_METHOD_FIELD} ${CMETHOD},${CFIELD} "
-done; done;
-echo $str_C_METHOD_FIELD;
-
-# turn string sequence into array
-IFS=' ' read -r -a C_METHODS_FIELDS <<< "$str_C_METHOD_FIELD";
-
-echo $C_METHODS_FIELDS;
-for CMF       in ${C_METHODS_FIELDS[@]}; do
-  echo $CMF
-  # OLDIFS=$IFS; 
-  # IFS=',';
-  # set -- $CMF;
-  # echo ">$1 $2<";
-  # IFS=$OLDIFS;
-done;
-
-DURATION=1-23:59:59;
-PATTERNS=( SAT-01-12 SAT-03-11 );
-TWINS=( 5 10 15 20 30 60 );
-
-OLDIFS=$IFS; 
-IFS=',';
-for CMF       in "${C_METHODS_FIELDS[@]}"; do
-  echo $CMF
-  set -- $CMF;
-  CMETHOD=$1;
-  CFIELD=$2;
-for PATTERN   in ${PATTERNS[@]};  do
-for TWIN      in ${TWINS[@]};     do
-  echo $CMETHOD $CFIELD $TWIN $PATTERN
-  # c="python3 script.py -p $PATTERN -t $TWIN -m $CMETHOD -f $CFIELD" 
-  # LOG_NAME=./log/log-${PATTERN}-${CMETHOD}-${CFIELD}-t${TWIN};
-  # c="srun -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION $c";
-  # echo $c
-  # #eval '$c';
-done; done; done;
-IFS=$OLDIFS;
-
-
-OLDIFS=$IFS; 
-IFS=',';
-for CMF       in ${C_METHODS_FIELDS[@]}; do
-  set -- $CMF;
-  CMETHOD=$1;
-  CFIELD=$2;
-  echo $CMETHOD $CFIELD
-  done;
-IFS=$OLDIFS;
-
-# copy paste the following into command prompt to run the codes in parallel
-DURATION=2-23:59:59
-PATTERN=SAT-01-12;
-CMETHOD=
-TWIN=5;  LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=10; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=15; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=20; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=30; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=60; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-
-PATTERN=SAT-03-11;
-TWIN=5;  LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=10; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=15; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=20; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=30; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-TWIN=60; LOG_NAME=log-${PATTERN}-t${TWIN}; eval 'srun -J t${TWIN}-${PATTERN} -p gpu -o ${LOG_NAME}.txt -e ${LOG_NAME}.err --time=$DURATION python3 script.py $PATTERN $TWIN' &
-
-"""
 
 # %%
 PATTERNS_GROUP=["SAT-01-12", "SAT-03-11"] # filename patterns
@@ -156,6 +78,10 @@ TIME_WINDOW = args.twin
 CMETHOD = args.cmethod
 CFIELD = args.cfield
 
+# MAX_CID must be determined by cat-method and time-win. Also each dataset 
+# has different variation, which must be taken into account
+MAX_CID = 13 
+
 if(FILENAME_PATTERN not in PATTERNS_GROUP):
   eprint("ERR ", FILENAME_PATTERN, "unknown")
   raise Exception("Unknown filename pattern")
@@ -169,8 +95,7 @@ if(CFIELD not in CFIELD_GROUP):
 if (CMETHOD == "none"): # only one category
   CID_GROUP = [0] # group of category IDs for this method
 else:
-  lastcid=20
-  CID_GROUP = [i+1 for i in range(lastcid)]
+  CID_GROUP = [i+1 for i in range(MAX_CID)]
 
 print(f"filename pattern:{FILENAME_PATTERN}, time window:{TIME_WINDOW}, cmethod:{CMETHOD}, cfield:{CFIELD}")
 # files = [f"{ftddir}/{f}" for f in os.listdir (ftddir) if "SAT-01-12" in f]
@@ -243,6 +168,7 @@ TSLABELS=[
           (get_ts(datetime(2018, 12, 1, 13, 34)), "SYN"), 
           (get_ts(datetime(2018, 12, 1, 13, 35)), "NORMAL"), 
           (get_ts(datetime(2018, 12, 1, 17, 15)), "TFTP"), 
+          (get_ts(datetime(2018, 12, 1, 23, 59)), "NORMAL"), 
           
           (get_ts(datetime(2018, 11, 3,  9, 43)), "NORMAL"), 
           (get_ts(datetime(2018, 11, 3,  9, 51)), "PortMap"), 
@@ -257,7 +183,8 @@ TSLABELS=[
           (get_ts(datetime(2018, 11, 3, 11, 14)), "NORMAL"), 
           (get_ts(datetime(2018, 11, 3, 11, 24)), "UDP_Lag"), 
           (get_ts(datetime(2018, 11, 3, 11, 28)), "NORMAL"), 
-          (get_ts(datetime(2018, 11, 3, 17, 35)), "SYN")
+          (get_ts(datetime(2018, 11, 3, 17, 35)), "SYN"),
+          (get_ts(datetime(2018, 11, 3, 23, 59)), "NORMAL")
 ]
 
 # %%

@@ -1,5 +1,55 @@
+from json.tool import main
+from threading import main_thread
+from unicodedata import name
+
+from cv2 import norm
 import numpy as np
 import math
+
+def entropy(column, base=np.e):
+    """Given a list of values, it will return entropy level as well as
+    normalized entropy of that list
+    c=[1,1,1,1,1,2,2,1,1,1,1,1,3,1,3,1,2,1,1,1,2,3,3,2,1,1]
+    r, r_norm =entropy(c)"""
+    # p = pd.Series(column).value_counts(normalize=True, sort=False)
+    vc = np.unique(column, return_counts=True) # get the values count
+    # p = [15, 4, 8]/sum()
+    s = vc[1].sum()
+    p = vc[1]/s
+
+    H = -(p * np.log(p)).sum()
+    H = H/np.log(base)
+    
+    denom = np.log(s)/np.log(base)
+    Hn = H/denom
+
+    return H, Hn
+
+def dataframe_entropies(df, columns=None, base=2, add_normalized=True):
+    """
+    Calculated entropies of given columns of a pandas dataframe.
+    If add_normalized is True, then include a normalized entry as well per column
+    """
+    # print(df.head())
+    if (not columns):
+        columns = df.columns
+    # get entropy if saddr
+    entropies={}  
+    if(len(df) == 0):
+        for c in columns:
+            entropies[f"entropy-{c}"] = 0        
+    else:
+        if(add_normalized):
+            for c in columns:
+                H, Hn = entropy(df[c], base=2)
+                entropies[f"entropy-{c}"] = H
+                entropies[f"normalized-{c}"] = Hn
+        else:
+            for c in columns:
+                H, Hn = entropy(df[c], base=2)
+                entropies[f"entropy-{c}"] = H
+    return entropies
+
 
 def entropy_old (tbl):
     """ Calculate entropy of each column of the given tbl.
@@ -35,7 +85,7 @@ def entropy_old (tbl):
     # print ('%.2f %.2f %.2f %.2f '%(t2-t1, t3-t2, t4-t3, t5-t4))
     return plogp.sum (axis=0) # sum over columns, and return a list of entries
 
-def entropy (tbl):
+def table_entropy (tbl):
     """ Calculate entropy of each column of the given tbl.
     The tbl is a nxm numpy object.
     The function returns a m elements numpy array
@@ -70,3 +120,10 @@ def entropy (tbl):
     # print ('%.2f %.2f %.2f %.2f '%(t2-t1, t3-t2, t4-t3, t5-t4))
     
     return nlogn.sum (axis=0)/N + np.log(N) # sum over columns, and return a list of entries
+
+
+if __name__=="__main__":
+    # test the function
+    c=[1,1,1,1,1,2,2,1,1,1,1,1,3,1,3,1,2,1,1,1,2,3,3,2,1,1]
+    r=entropy(c)
+    print(r)

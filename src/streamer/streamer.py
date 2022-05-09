@@ -3,6 +3,7 @@ import os, sys
 from abc import ABCMeta, ABC, abstractmethod
 from pickle import NONE
 from queue import Empty, Full, Queue
+from tkinter.messagebox import NO
 from typing import Generator
 
 
@@ -26,6 +27,10 @@ class Streamer (ABC):
 
   @abstractmethod
   def summary(self) -> None:
+    pass
+
+  @abstractmethod
+  def close(self) -> None:
     pass
 
 
@@ -60,23 +65,25 @@ class FlowPacketStreamer (Streamer):
     if(source_type=="file" or source_type=="files"):
       if(isinstance(source, str)):
         self.files=[source]
-      elif(not isinstance(source, list)):
+      elif(isinstance(source, list)):
+        self.files=source
+      else:
         eprint("source is expected to be a string or a list of strings.")
         raise
-      self.files=source
     elif (source_type=="dir"):
       for filename in os.listdir(source):
         if(filenamefilter(filename)):
           self.files.append(f"{source}/{filename}")
-
+    
     if(not dontsort):
       self.files.sort()
-    
+    self.qufiles = [(i, self.files[i]) for i in range(len(self.files))]
+      
     # hook the first streamer
     self._hook_next_streamer()
 
   def summary(self):
-    print("The file to be used:")
+    print("The file(s) to be used:")
     for f in self.files:
       print(f"  {f}")
 
@@ -84,10 +91,21 @@ class FlowPacketStreamer (Streamer):
     if(self._nxt_streamer_index >= len(self.files)):
       self._streamer = None
       return None
+    if(len(self.qufiles) == 0):
+      self._streamer = None
+      return None
     filepath = self.files [self._nxt_streamer_index]
-    self._nxt_streamer_index += 1
+    id, filepath = self.qufiles[0]
+    self.qufiles = self.qufiles[1:]
     self._streamer = Parser(filepath, buffersize=self._bufsize) # check memory utilization with buffer size
+
+    print(f"pcap file index:{id} ({len(self.qufiles)} left), {os.path.basename(filepath)}")
+    if(self._streamer == None):
+      print("Problem opening this file")
     return self._streamer
+  
+  def close():
+    pass
   
   def getnext(self):
     if(self._streamer == None):
@@ -121,18 +139,18 @@ class FtdObjStreamer (Streamer):
     if(source_type=="file" or source_type=="files"):
       if(isinstance(source, str)):
         self.files=[source]
-      elif(not isinstance(source, list)):
+      elif(isinstance(source, list)):
+        self.files=source
+      else:
         eprint("source is expected to be a string or a list of strings.")
         raise
-      self.files=source
-      if(not dontsort):
-        self.files.sort()
+      
     elif (source_type=="dir"):
       for path in os.listdir(source):
         if(pathfilter(path)):
           self.files.append(f"{source}/{path}")
-      self.files.sort()
-
+    if(not dontsort):
+        self.files.sort()
   def source_generator(self):
     for filepath in self.files:
       # reader = Parser(filepath, buffersize=100000) # check memory utilization with buffer size

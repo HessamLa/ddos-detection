@@ -1,11 +1,29 @@
 # import structures
 import sys
 import math
+import datetime
 
 def eprint(*args, **kwargs):
     """This function will print the given arguments to STDERR
     """
     print(*args, file=sys.stderr, **kwargs)
+
+def tprint(*args, **kwargs):
+    """This function will print the given arguments with time
+    string prepended
+    file: sets the output. Ex. file=sys.stdout or file=sys.stderr
+    strftime: is a string that sets the time format according to datetime strftime formats
+              Ex. strftime="%m/%d/%Y, %H:%M:%S"
+
+    tprint("hi", 4, f"4+3={4+3}", strftime="%Y-%m")
+    output: 2021-12 hi 4 4+3=7
+    """
+    tstring = datetime.datetime.now()
+    if("strftime" in kwargs):
+      strformat=kwargs["strftime"]
+      del kwargs["strftime"]
+      tstring = tstring.strftime(strformat)
+    print(tstring, *args, **kwargs)
 
 def ipStr2Hex (ipStr):
     """Convert ip string from dot-separated decimal into a hexadecimal string."""

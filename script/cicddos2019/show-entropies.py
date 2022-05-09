@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # %%
 import sys, os
-from cv2 import INPAINT_TELEA
 import pandas as pd
 import numpy as np
 
@@ -39,7 +38,7 @@ parser = argparse.ArgumentParser(description='Process some integers.')
 # parser.add_argument('--pattern', '-p', type=str,   default="SAT-03-11", help='filename pattern')
 parser.add_argument('--pattern', '-p', type=str,   default="SAT-01-12", help='filename pattern')
 parser.add_argument('--twin',    '-t', type=float, default=10.0, help='time window')
-parser.add_argument('--cmethod', '-m', type=str,   default='catlog2', help='categorization method. catlog2, catlog10, catloge')
+parser.add_argument('--cmethod', '-m', type=str,   default='catlog10', help='categorization method. catlog2, catlog10, catloge')
 parser.add_argument('--cfield',  '-f', type=str,   default='pktcnt', help='categorization field. pktcnt, pktlen')
 # args = parser.parse_args()
 args, unknown = parser.parse_known_args()
@@ -62,6 +61,10 @@ TIME_WINDOW = args.twin
 CMETHOD = args.cmethod
 CFIELD = args.cfield
 
+# MAX_CID must be determined by cat-method and time-win. Also each dataset 
+# has different variation, which must be taken into account
+MAX_CID = 13 
+
 if(FILENAME_PATTERN not in PATTERNS_GROUP):
   eprint("ERR ", FILENAME_PATTERN, "unknown")
   raise Exception("Unknown filename pattern")
@@ -71,22 +74,12 @@ if(CMETHOD not in CMETHOD_GROUP):
 if(CFIELD not in CFIELD_GROUP):
   eprint("ERR ", CFIELD, "unknown")
   raise Exception("Unknown categorization field")
-
-if (CMETHOD == "none"): # only one category
-  CID_GROUP = [0] # group of category IDs for this method
-else:
-  lastcid=20
-  CID_GROUP = [i+1 for i in range(lastcid)]
-
 print(f"filename pattern:{FILENAME_PATTERN}, time window:{TIME_WINDOW}, cmethod:{CMETHOD}, cfield:{CFIELD}")
 
-
 if (CMETHOD == "none"): # only one category
   CID_GROUP = [0] # group of category IDs for this method
 else:
-  lastcid=20
-  CID_GROUP = [i+1 for i in range(lastcid)]
-
+  CID_GROUP = [i+1 for i in range(MAX_CID)]
 
 ENTROPIES_DIR = f"./categories-tovictim-{FILENAME_PATTERN}/{CMETHOD}/{CFIELD}/t{TIME_WINDOW:02.0f}"
 # files = [f"{ENTROPIES_DIR}/cid{cid}.pkl" for f in os.listdir (ENTROPIES_DIR) if FILENAME_PATTERN in f]
@@ -119,6 +112,13 @@ maindf={}
 cids=[]
 for cid, d in data.items():
   df = pd.DataFrame.from_dict(d)
+  print(df.iloc[0]['label'], 
+        df.iloc[-1]['label'], 
+        df.iloc[-1]['ts-to'],
+        df.iloc[-1]['ts-from']
+        ) 
+    # df['ts-to'][-1], df['ts-from'][-1])
+
   df["timestamp"] = df['ts-from'].apply(pd.Timestamp, unit='s')
   df.set_index("timestamp", inplace=True)
   df.drop(columns=['ts-to','ts-from'], inplace=True)
@@ -144,38 +144,103 @@ df = maindf[cids[0]] # get the first df
 # %%
 
 i=0
-label = [df.iloc[i]['label']]
+label_str = [df.iloc[i]['label']]
 iloc = [i]
-index = [df.index[i]]
-
+indices = [df.index[i]]
 for i in range(len(df)):
-  if(label[-1] == df.iloc[i]['label']):
+  if(label_str[-1] == df.iloc[i]['label']):
     continue
-  label.append(df.iloc[i]['label'])
+  label_str.append(df.iloc[i]['label'])
   iloc.append(i)
-  index.append(df.index[i])
+  indices.append(df.index[i])
 
-for idx, i, l in zip(index, iloc, label):
-  print(f"{idx} {i:5d} {l}")
+Z = zip(indices.copy(), iloc.copy(), label_str.copy())
+print(type(Z))
+# for idx, i, l in Z:
+#   print(f"{idx} {i:5d} {l}")
+
+# %% 
+print(len(maindf))
 
 # %%
-cid=2
+def plot_verticals(ax, indices, texts=None, **kwargs):  
+  for i in range(len(indices)):
+    idx = indices[i]
+    ax.axvline(x=idx, **kwargs)
+    s=None
+    if(texts):
+      s = texts[i]
+      ax.text(x=idx, y=0, verticalalignment='center', s=s, fontsize='small', rotation='vertical')
+    
+
+def generate_charts(df, cols, axs, vertical_indices=None, label_str=None, show=True, save=None):
+  for i in range(len(cols)):
+    c = cols[i]
+    ax = axs[i]
+    ax.set_title(label=c, loc='left', pad=-10)
+    # ax.set_ylabel(c, rotation=0)
+    df[c].plot(ax=ax)
+    if(vertical_indices):
+      plot_verticals(ax, vertical_indices, c='r', linewidth=1)
+  
+  if(label_str):
+    (df['label-id']*0).plot(ax=axs[-1]) # multiply by zero to make a flat line
+    plot_verticals(axs[-1], indices, texts=label_str, c='r', linewidth=1)
+
+cols = ['flowcnt', 'pktcnt', 'meanpktcnt', 'stdpktcnt', 'meanpktlen', 'stdpktlen',
+       'entropy-saddr', 'entropy-daddr', 'entropy-proto', 'entropy-sport', 'entropy-dport',
+       'normalized-saddr', 'normalized-daddr', 'normalized-proto', 'normalized-sport', 'normalized-dport']
+print("CID_CROUP:", CID_GROUP)
+for cid in CID_GROUP:
+  print("cid:", cid)
+  fig, axs = plt.subplots(nrows=len(cols)+1, sharex=True, figsize=(20,16),
+          gridspec_kw={'height_ratios': [1]*len(cols)+[2]})
+  df = maindf[cid]
+  generate_charts(df, cols, axs, vertical_indices=indices, label_str=label_str)
+  fig.suptitle(f"{ENTROPIES_DIR} cid:{cid}", fontsize=16)
+  savepath = f"images/{CMETHOD}-t{TIME_WINDOW}-cid{cid:02d}.png"
+  fig.savefig(savepath)
+  print(f"saved to {savepath}")
+  fig.show()
+# %%
+# draw stack of entropies, weighted by packet count, normalized to sum 1
+
+# %%
+cid=7
 df = maindf[cid]
-print(type(df))
-print(df.columns)
+
 cols = ['flowcnt', 'pktcnt', 'meanpktcnt', 'stdpktcnt', 'meanpktlen',
-       'stdpktlen', 'entropy-saddr', 'entropy-daddr', 'entropy-proto',
-       'entropy-sport', 'entropy-dport']
-fig, axs = plt.subplots(nrows=len(cols)+1, sharex=True, figsize=(15,10))
+       'stdpktlen',
+       'entropy-saddr', 'entropy-daddr', 'entropy-proto', 'entropy-sport', 'entropy-dport',
+       'normalized-saddr', 'normalized-daddr', 'normalized-proto', 'normalized-sport', 'normalized-dport']
+
+fig, axs = plt.subplots(nrows=len(cols)+1, sharex=True, figsize=(20,16),
+        gridspec_kw={'height_ratios': [1]*len(cols)+[2]})
 for i in range(len(cols)):
   c = cols[i]
   ax = axs[i]
   ax.set_title(label=c, loc='left', pad=-1)
   df[c].plot(ax=ax)
+  plot_verticals(ax, indices, c='r', linewidth=1)
 
-df['label-id'].plot(ax=axs[-1])
+(df['label-id']*0).plot(ax=axs[-1]) # multiply by zero to make a flat line
+plot_verticals(axs[-1], indices, texts=label_str, c='r', linewidth=1)
+
 fig.suptitle(f"{ENTROPIES_DIR} cid:{cid}", fontsize=16)
 fig.savefig(f"img-t{TIME_WINDOW}-cid{cid:02d}.png")
+fig.show()
+#%%
+x = df['label-id']
+fig, ax = plt.subplots(1,1)
+ax.plot(x)
+print(x.head())
+for idx in index:
+  ax.axvline(x=idx, c='r')
+# %%
+print(df['label-id'])
+df['label-id'].plot()
+print(len(cols))
+print(len(axs))
 # %%
 cid=3
 for cid, df in maindf.items():

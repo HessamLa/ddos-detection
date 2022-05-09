@@ -12,6 +12,7 @@ class pickle_read:
         # from datastructures import structures
         self.filepath = filepath
         mode='rb'
+        print("opening", filepath,flush=True)
         self.f = open(filepath, mode)
         if (self.f is None):
             eprint ("ERR: Openning FTD file", filepath)
@@ -33,9 +34,9 @@ class pickle_read:
             obj = pickle.load(self.f)
         except EOFError:
             return None
-        except:
+        except Exception as e:
             eprint("pickle_read.get_next() Unknown exception")
-            raise
+            raise e
         return obj
     
     def objects (self):
@@ -44,10 +45,18 @@ class pickle_read:
                 obj = pickle.load(self.f)
                 yield obj
             except EOFError:
+                self.close()
                 return
-            except:
-                eprint("pickle_read.objects() Unknown exception")
+            except StopIteration:
+                print("Stopped iteration", file=sys.stderr, flush=True)
+            except Exception as e:
+                print("Exception", file=sys.stderr, flush=True)
+                print(e, file=sys.stderr, flush=True)
                 raise
+
+            # except:
+            #     eprint("pickle_read.objects() Unknown exception")
+            #     raise
     
     def close (self):
         if (self.f):
@@ -115,8 +124,23 @@ def pickle_dump(filepath, obj, mode="wb"):
     pickle.dump(obj, file)
     file.close()
 
+
+def pickle_objects(files):
+  """from a list of filenames which are python pickle formats, it will
+  open each file in order, and yield pickled objects sequentially."""
+  for f in files:
+    reader = pickle_read (f)
+    for obj in reader.objects():
+      yield obj
+    reader.close()
+
 if __name__ == "__main__":
     path="/N/slate/hessamla/ddos-datasets/caida/output-t10/caida-t10-cftbl-any-k0.ent"
     reader = pickle_read(path)
     obj = reader.load()
     print (obj)
+
+    # path1="filename1"
+    # path2="filename2"
+    # for obj in pickle_objects([path1, path2]):
+    #     #do something with obj
